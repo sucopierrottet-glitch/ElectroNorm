@@ -1,0 +1,40 @@
+name: electronorm
+description: "ElectroNorm Pro - Field Electrical Conduit Fill, Derating & Compliance Report Engine"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # UI & Vector Graphics
+  cupertino_icons: ^1.0.8
+  google_fonts: ^9.0.0
+  intl: ^0.20.3
+
+  # PDF Generation & Printing
+  pdf: ^3.13.1
+  printing: ^5.15.1
+
+  # Digital Signature Capture
+  signature: ^6.4.0
+
+  # Offline Persistence & Sharing
+  shared_preferences: ^2.5.5
+  path_provider: ^2.1.6
+  share_plus: ^13.3.1
+  uuid: ^4.6.0
+  url_launcher: ^6.3.3
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
