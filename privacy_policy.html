@@ -1,265 +1,134 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Privacy Policy — ElectroNorm Pro</title>
-  <style>
-    :root {
-      --bg-color: #0b0f19;
-      --card-bg: #161f30;
-      --accent-color: #00e676;
-      --caution-color: #ffd600;
-      --text-primary: #f8fafc;
-      --text-secondary: #94a3b8;
-      --border-color: #2d3c52;
-      --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      background-color: var(--bg-color);
-      color: var(--text-primary);
-      font-family: var(--font-family);
-      line-height: 1.6;
-      padding: 24px 16px;
-    }
-
-    .container {
-      max-width: 800px;
-      margin: 0 auto;
-      background: var(--card-bg);
-      border: 1px solid var(--border-color);
-      border-radius: 16px;
-      padding: 36px 28px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    }
-
-    header {
-      border-bottom: 1px solid var(--border-color);
-      padding-bottom: 24px;
-      margin-bottom: 28px;
-    }
-
-    .app-badge {
-      display: inline-block;
-      background: rgba(0, 230, 118, 0.15);
-      color: var(--accent-color);
-      border: 1px solid var(--accent-color);
-      font-weight: 700;
-      font-size: 12px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      padding: 4px 10px;
-      border-radius: 6px;
-      margin-bottom: 12px;
-    }
-
-    h1 {
-      font-size: 28px;
-      color: var(--text-primary);
-      margin-bottom: 8px;
-    }
-
-    .meta {
-      color: var(--text-secondary);
-      font-size: 13px;
-    }
-
-    h2 {
-      font-size: 20px;
-      color: var(--text-primary);
-      margin-top: 28px;
-      margin-bottom: 12px;
-      border-left: 4px solid var(--accent-color);
-      padding-left: 10px;
-    }
-
-    p, li {
-      font-size: 15px;
-      color: var(--text-secondary);
-      margin-bottom: 12px;
-    }
-
-    ul {
-      padding-left: 20px;
-      margin-bottom: 16px;
-    }
-
-    li {
-      margin-bottom: 6px;
-    }
-
-    strong {
-      color: var(--text-primary);
-    }
-
-    .callout {
-      background: rgba(0, 230, 118, 0.08);
-      border-left: 4px solid var(--accent-color);
-      padding: 14px 18px;
-      border-radius: 8px;
-      margin: 20px 0;
-    }
-
-    .callout p {
-      color: var(--text-primary);
-      margin-bottom: 0;
-    }
-
-    .pricing-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin: 16px 0;
-    }
-
-    .pricing-table th, .pricing-table td {
-      border: 1px solid var(--border-color);
-      padding: 10px 14px;
-      text-align: left;
-      font-size: 14px;
-    }
-
-    .pricing-table th {
-      background: #1e293b;
-      color: var(--text-primary);
-    }
-
-    .pricing-table td {
-      color: var(--text-secondary);
-    }
-
-    footer {
-      border-top: 1px solid var(--border-color);
-      padding-top: 20px;
-      margin-top: 36px;
-      font-size: 13px;
-      color: var(--text-secondary);
-      text-align: center;
-    }
-
-    a {
-      color: var(--accent-color);
-      text-decoration: none;
-    }
-
-    a:hover {
-      text-decoration: underline;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Política de Privacidad - ElectroNorm Pro</title>
+    <style>
+        :root {
+            --bg-color: #0B0F19;
+            --card-bg: #161F30;
+            --text-primary: #F8FAFC;
+            --text-secondary: #94A3B8;
+            --accent: #00E676;
+            --caution: #FFD600;
+            --border: #2D3C52;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 40px 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 780px;
+            margin: 0 auto;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 36px 32px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        h1 {
+            color: var(--accent);
+            font-size: 28px;
+            margin-top: 0;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 16px;
+            letter-spacing: -0.5px;
+        }
+        h2 {
+            font-size: 19px;
+            color: var(--text-primary);
+            margin-top: 28px;
+            border-left: 3px solid var(--accent);
+            padding-left: 10px;
+        }
+        p, li {
+            color: var(--text-secondary);
+            font-size: 15px;
+        }
+        ul {
+            padding-left: 20px;
+            margin-bottom: 14px;
+        }
+        li {
+            margin-bottom: 6px;
+        }
+        strong {
+            color: var(--text-primary);
+        }
+        .badge {
+            display: inline-block;
+            background: rgba(0, 230, 118, 0.15);
+            color: var(--accent);
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 20px;
+            letter-spacing: 0.3px;
+            border: 1px solid rgba(0, 230, 118, 0.3);
+        }
+        .footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            font-size: 13px;
+            color: #64748B;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <header>
-      <div class="app-badge">Official Store Policy</div>
-      <h1>Privacy Policy for ElectroNorm Pro</h1>
-      <div class="meta">
-        <strong>Application:</strong> ElectroNorm Pro (<code>com.simpleappspg.electronorm</code>)<br>
-        <strong>Developer:</strong> SimpleApps PG (<code>simpleappspg</code>)<br>
-        <strong>Effective Date:</strong> October 13, 2026
-      </div>
-    </header>
+    <div class="container">
+        <span class="badge">Válido para Google Play Store & Apple App Store</span>
+        <h1>Política de Privacidad de ElectroNorm Pro</h1>
+        <p><strong>Última actualización:</strong> Octubre 2026</p>
 
-    <div class="callout">
-      <p><strong>100% Offline-First Architecture Guarantee:</strong> ElectroNorm Pro operates completely on your local device. We do not operate external databases, tracking servers, or telemetry services. Your electrical calculations, conduit schedules, and digital signatures remain strictly on your device.</p>
+        <p>En <strong>ElectroNorm Pro</strong> (desarrollada por <strong>SimpleApps PG</strong>, "nosotros", "la aplicación"), respetamos profundamente su privacidad y nos tomamos con la máxima seriedad la protección de los datos técnicos y profesionales. Esta Política de Privacidad describe de manera transparente cómo se gestiona la información al utilizar nuestra aplicación móvil.</p>
+
+        <h2>1. Principio Offline-First y Almacenamiento Local</h2>
+        <p>ElectroNorm Pro está construida bajo una estricta arquitectura de privacidad <em>Offline-First</em> (local en el dispositivo):</p>
+        <ul>
+            <li><strong>Cálculos Eléctricos y Proyectos Guardados:</strong> Todos los datos ingresados (calibres de conductores, tipos de tubería, caídas de tensión, factores de corrección por temperatura, nombres de proyectos, notas de ubicación y memorias descriptivas) se almacenan <strong>exclusivamente en la memoria segura de su dispositivo</strong>.</li>
+            <li><strong>Perfil Profesional del Técnico y Firmas:</strong> El nombre del técnico electricista o ingeniero, matrícula profesional, empresa contratista y la firma digital dibujada en pantalla para la expedición de reportes nunca se transmiten a servidores externos ni se comparten con terceros.</li>
+            <li>No contamos con servidores intermedios de rastreo, bases de datos remotas ni mecanismos de telemetría que capturen sus proyectos o cálculos de ingeniería.</li>
+        </ul>
+
+        <h2>2. Ausencia de Registro Obligatorio</h2>
+        <p>Para utilizar ElectroNorm Pro no es necesario registrarse con una cuenta, ingresar correos electrónicos para autenticación ni definir contraseñas. Sus herramientas de cálculo y proyectos técnicos le pertenecen en su totalidad a usted y a su equipo.</p>
+
+        <h2>3. Procesamiento de Pagos y Suscripciones (In-App Purchases)</h2>
+        <p>Las compras y suscripciones dentro de la aplicación (ElectroNorm Pro) se procesan directamente a través de las plataformas oficiales y certificadas de las tiendas de aplicaciones:</p>
+        <ul>
+            <li><strong>Google Play Billing (Google LLC):</strong> En dispositivos Android.</li>
+            <li><strong>Apple In-App Purchases (Apple Inc.):</strong> En dispositivos iOS.</li>
+        </ul>
+        <p>ElectroNorm Pro no tiene acceso, no procesa y no almacena información de tarjetas de crédito o datos bancarios del usuario. Dichas operaciones se realizan con cifrado de extremo a extremo y se rigen bajo los términos de servicio y políticas de privacidad de Google Play y Apple.</p>
+
+        <h2>4. Permisos del Dispositivo</h2>
+        <p>La aplicación solicita únicamente los permisos indispensables para la ejecución de sus funciones de ingeniería:</p>
+        <ul>
+            <li><strong>Almacenamiento / Guardar Archivo:</strong> Utilizado exclusivamente para generar, guardar localmente y compartir las memorias de cálculo y reportes técnicos en formato PDF.</li>
+            <li><strong>Acceso a Internet:</strong> Utilizado de manera pasiva y segura por el sistema operativo para verificar el estado de suscripción con Google Play / App Store o para abrir enlaces web que el propio usuario solicite expresamente (como consultar este documento de privacidad).</li>
+        </ul>
+
+        <h2>5. Menores de Edad</h2>
+        <p>ElectroNorm Pro es un software de productividad técnica e ingeniería profesional, no dirigido a menores de 13 años. No recopilamos datos personales de menores de edad.</p>
+
+        <h2>6. Modificaciones a esta Política</h2>
+        <p>Podemos actualizar esta Política de Privacidad para reflejar mejoras operativas o normativas. Cualquier cambio entrará en vigor de inmediato con la actualización de la fecha en la parte superior y a través de las notas de la versión en las tiendas de aplicaciones.</p>
+
+        <h2>7. Contacto y Soporte</h2>
+        <p>Si tiene preguntas, inquietudes o comentarios sobre la privacidad y el tratamiento de datos en ElectroNorm Pro, puede comunicarse con el equipo de desarrollo a través de:</p>
+        <p><strong>soporte@electronorm.app</strong> o mediante el canal oficial de soporte del desarrollador en Google Play.</p>
+
+        <div class="footer">
+            &copy; 2026 ElectroNorm Pro — SimpleApps PG. Todos los derechos reservados.
+        </div>
     </div>
-
-    <h2>1. Introduction & Overview</h2>
-    <p>SimpleApps PG ("we," "our," or "us") respects your privacy. This Privacy Policy discloses the privacy practices for the <strong>ElectroNorm Pro</strong> mobile application for electrical engineers, contractors, and inspectors. ElectroNorm Pro is designed from the ground up as an offline-first engineering utility that functions in remote substations, industrial plants, and mechanical rooms without network connectivity.</p>
-
-    <h2>2. Information Collection and Telemetry</h2>
-    <p>We believe in absolute data minimization:</p>
-    <ul>
-      <li><strong>Zero Personal Data Collection:</strong> We do not collect, transmit, sell, or store your name, email, physical location, or contact details on any remote server.</li>
-      <li><strong>Zero Analytics & Tracking:</strong> ElectroNorm Pro does not contain Google Analytics, Firebase Analytics, Crashlytics, Facebook SDK, or any third-party behavioral telemetry SDKs.</li>
-      <li><strong>Zero Advertising Networks:</strong> There are no advertisements, ad networks, or ad measurement identifiers embedded in ElectroNorm Pro.</li>
-    </ul>
-
-    <h2>3. Local On-Device Storage</h2>
-    <p>ElectroNorm Pro utilizes sandboxed local storage (<code>SharedPreferences</code> and internal app directory storage) exclusively on your device for:</p>
-    <ul>
-      <li><strong>Saved Conduit Runs:</strong> Raceway profiles, conductor schedules, wire groupings, voltage drop matrices, and derating calculations that you choose to save.</li>
-      <li><strong>Technician & Company Profile:</strong> Electrician name, company branding, and state license number used to populate generated PDF compliance reports.</li>
-      <li><strong>Subscription & Preference State:</strong> Local subscription status, free trial activation timestamps, and unit preferences.</li>
-    </ul>
-    <p>This data is stored within your device's private application sandbox and is not accessible by other applications.</p>
-
-    <h2>4. Digital Signatures & PDF Generation</h2>
-    <p>ElectroNorm Pro provides an on-device digital signature pad allowing technicians and Authority Having Jurisdiction (AHJ) inspectors to sign compliance reports:</p>
-    <ul>
-      <li>Signature strokes are converted to vector images directly in device memory.</li>
-      <li>The signature is embedded locally into the generated PDF document.</li>
-      <li>Signatures are <strong>never</strong> transmitted to cloud servers, external verification services, or third-party storage.</li>
-    </ul>
-
-    <h2>5. Android Device Permissions</h2>
-    <p>ElectroNorm Pro adheres strictly to the Principle of Least Privilege. We request only the following standard Android permission:</p>
-    <ul>
-      <li><code>android.permission.INTERNET</code>: Required solely for in-app subscription validation via Google Play Billing, checking store connectivity, and allowing users to view this Privacy Policy via their external browser.</li>
-    </ul>
-    <p>ElectroNorm Pro <strong>does NOT request or require</strong> any high-risk or sensitive permissions, including:</p>
-    <ul>
-      <li>Zero Camera permissions (<code>CAMERA</code>)</li>
-      <li>Zero Location permissions (<code>ACCESS_FINE_LOCATION</code>, <code>ACCESS_COARSE_LOCATION</code>)</li>
-      <li>Zero Audio/Microphone permissions (<code>RECORD_AUDIO</code>)</li>
-      <li>Zero Contacts permissions (<code>READ_CONTACTS</code>)</li>
-      <li>Zero Shared Storage permissions (<code>READ_EXTERNAL_STORAGE</code>, <code>MANAGE_EXTERNAL_STORAGE</code>)</li>
-    </ul>
-
-    <h2>6. In-App Subscriptions & Purchases</h2>
-    <p>ElectroNorm Pro offers optional auto-renewable subscriptions to unlock Pro capabilities:</p>
-    <table class="pricing-table">
-      <thead>
-        <tr>
-          <th>Plan</th>
-          <th>Price</th>
-          <th>Trial / Billing Terms</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><strong>Annual Pass</strong></td>
-          <td>$69.00 / year ($5.75/mo)</td>
-          <td>Includes 14-Day Free Trial. Billed annually. Cancel anytime.</td>
-        </tr>
-        <tr>
-          <td><strong>Monthly Subscription</strong></td>
-          <td>$8.99 / month</td>
-          <td>Recurring monthly billing. Cancel anytime.</td>
-        </tr>
-      </tbody>
-    </table>
-    <p>All subscription purchases and billing transactions are processed securely and directly by <strong>Google Play In-App Billing</strong>. SimpleApps PG does not process, receive, or store credit card numbers, bank details, or billing addresses.</p>
-
-    <h2>7. Data Retention, Control & Deletion</h2>
-    <p>You maintain complete control over your data at all times:</p>
-    <ul>
-      <li><strong>In-App Deletion:</strong> You can delete any saved project run at any time using the delete icon or swipe-to-delete gesture within the Saved Projects screen.</li>
-      <li><strong>Immediate Local Wipe:</strong> Uninstalling ElectroNorm Pro or clearing the app storage cache in your Android system settings immediately and permanently deletes all saved calculations, profiles, and cached reports from your device.</li>
-    </ul>
-
-    <h2>8. Children's Privacy</h2>
-    <p>ElectroNorm Pro is an electrical engineering tool intended for trade professionals, inspectors, and contractors. We do not knowingly collect information from children under 13 years of age, complying fully with COPPA and GDPR regulations.</p>
-
-    <h2>9. Changes to This Privacy Policy</h2>
-    <p>We may update this Privacy Policy from time to time to reflect regulatory standards or app updates. Any updates will be published at this permanent URL with a revised effective date.</p>
-
-    <h2>10. Contact Us</h2>
-    <p>If you have any questions, suggestions, or concerns regarding this Privacy Policy or ElectroNorm Pro, please contact us at:</p>
-    <p>
-      <strong>Developer:</strong> SimpleApps PG<br>
-      <strong>Support Email:</strong> <a href="mailto:support@simpleappspg.com">support@simpleappspg.com</a><br>
-      <strong>Repository:</strong> <a href="https://github.com/sucopierrottet-glitch/ElectroNorm" target="_blank" rel="noopener">github.com/sucopierrottet-glitch/ElectroNorm</a>
-    </p>
-
-    <footer>
-      &copy; 2026 SimpleApps PG. All rights reserved. ElectroNorm Pro.
-    </footer>
-  </div>
 </body>
 </html>

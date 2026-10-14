@@ -213,7 +213,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   void _openPrivacyPolicy() async {
-    const url = 'https://sucopierrottet-glitch.github.io/ElectroNorm/privacy_policy.html';
+    const url = 'https://sucopierrottet-glitch.github.io/electronorm-privacy/';
     final uri = Uri.parse(url);
     try {
       if (await canLaunchUrl(uri)) {
