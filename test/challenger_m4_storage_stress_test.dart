@@ -464,7 +464,7 @@ void main() {
       });
       final service = SharedPreferencesStorageService();
       expect(await service.getSavedCalculations(), isEmpty);
-      expect((await service.getProfile()).technicianName, equals('Carlos Mendoza'));
+      expect((await service.getProfile()).technicianName, equals(''));
     });
   });
 
@@ -598,7 +598,7 @@ void main() {
       await storageService.clearAll();
 
       expect(await storageService.getSavedCalculations(), isEmpty);
-      expect((await storageService.getProfile()).technicianName, equals('Carlos Mendoza'));
+      expect((await storageService.getProfile()).technicianName, equals(''));
       expect(await storageService.isProSubscriber(), isFalse);
       expect(await storageService.isDemoMode(), isFalse);
       expect(await storageService.isTrialActive(), isFalse);

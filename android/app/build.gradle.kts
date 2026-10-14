@@ -15,7 +15,8 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.simpleappspg.electronorm"
-    compileSdk = 34
+    // Baseline Store Requirement: compileSdk = 34
+    compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -25,8 +26,10 @@ android {
 
     defaultConfig {
         applicationId = "com.simpleappspg.electronorm"
-        minSdk = 21
-        targetSdk = 34
+        // Baseline Store Requirement: minSdk = 21
+        minSdk = flutter.minSdkVersion
+        // Baseline Store Requirement: targetSdk = 34
+        targetSdk = flutter.targetSdkVersion
         versionCode = 1
         versionName = "1.0.0"
     }

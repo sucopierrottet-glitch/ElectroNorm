@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/painting.dart' show Color;
 import 'package:flutter/services.dart' show Uint8List;
 import 'package:intl/intl.dart';
@@ -142,7 +143,35 @@ class PdfReportService {
 
   /// Generates the raw A4 PDF bytes for the given compliance report data.
   static Future<Uint8List> generateReport(ComplianceReportData data) async {
+    pw.Font? fontBase;
+    pw.Font? fontBold;
+    bool isFlutterTest = false;
+    if (!kIsWeb) {
+      try {
+        isFlutterTest = Platform.environment.containsKey('FLUTTER_TEST');
+      } catch (_) {
+        isFlutterTest = false;
+      }
+    }
+
+    if (!isFlutterTest) {
+      try {
+        fontBase = await PdfGoogleFonts.robotoRegular();
+        fontBold = await PdfGoogleFonts.robotoBold();
+      } catch (_) {
+        fontBase = pw.Font.helvetica();
+        fontBold = pw.Font.helveticaBold();
+      }
+    } else {
+      fontBase = pw.Font.helvetica();
+      fontBold = pw.Font.helveticaBold();
+    }
+
     final doc = pw.Document(
+      theme: pw.ThemeData.withFont(
+        base: fontBase,
+        bold: fontBold,
+      ),
       title: 'Electrical Technical Compliance Report - ${data.projectTitle}',
       author: 'ElectroNorm Pro',
       creator: 'ElectroNorm Pro Pure Vector Compliance Engine',
@@ -328,15 +357,15 @@ class PdfReportService {
                 flex: 2,
                 child: _headerMetaItem(
                   'CLIENT / OWNER',
-                  data.clientName.isEmpty ? 'Acme Industrial Corp' : data.clientName,
+                  data.clientName.isEmpty ? 'N/A' : data.clientName,
                 ),
               ),
               pw.Expanded(
                 flex: 3,
                 child: _headerMetaItem(
                   'INSTALLING CONTRACTOR',
-                  data.companyName.isEmpty ? 'VoltPro Electrical Solutions LLC' : data.companyName,
-                  sub: 'Lead Tech: ${data.technicianName.isEmpty ? "Carlos Mendoza" : data.technicianName} | Lic #${data.licenseNumber}',
+                  data.companyName.isEmpty ? 'N/A' : data.companyName,
+                  sub: 'Lead Tech: ${data.technicianName.isEmpty ? "N/A" : data.technicianName} | Lic #${data.licenseNumber.isEmpty ? "N/A" : data.licenseNumber}',
                 ),
               ),
             ],
@@ -1155,10 +1184,10 @@ class PdfReportService {
                       ),
                       pw.SizedBox(height: 3),
                       pw.Text(
-                        'Lead Technician: ${data.technicianName.isEmpty ? "Carlos Mendoza" : data.technicianName}',
+                        'Lead Technician: ${data.technicianName.isEmpty ? "N/A" : data.technicianName}',
                         style: pw.TextStyle(color: cTextDark, fontSize: 7.5, fontWeight: pw.FontWeight.bold),
                       ),
-                      pw.Text('License / Cert #: ${data.licenseNumber}', style: const pw.TextStyle(color: cTextDark, fontSize: 7)),
+                      pw.Text('License / Cert #: ${data.licenseNumber.isEmpty ? "N/A" : data.licenseNumber}', style: const pw.TextStyle(color: cTextDark, fontSize: 7)),
                       pw.Text('Date: $formattedDate', style: const pw.TextStyle(color: cTextDark, fontSize: 7)),
                       pw.SizedBox(height: 12),
                       pw.Container(height: 0.6, color: cBorderDark),

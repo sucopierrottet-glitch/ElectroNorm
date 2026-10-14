@@ -18,9 +18,11 @@ import '../services/storage_service.dart';
 import 'paywall_screen.dart';
 import 'report_preview_screen.dart';
 import 'saved_projects_screen.dart';
+import 'settings_screen.dart';
 
 class CalculatorScreen extends StatefulWidget {
-  const CalculatorScreen({super.key});
+  final bool startEmpty;
+  const CalculatorScreen({super.key, this.startEmpty = false});
 
   @override
   State<CalculatorScreen> createState() => _CalculatorScreenState();
@@ -46,10 +48,22 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   double _ambientTempC = 30.0;
   double _terminalRatingC = 75.0;
 
+  TechnicianProfile _technicianProfile = TechnicianProfile.defaultProfile;
+
   @override
   void initState() {
     super.initState();
-    _loadDefaultPreset();
+    if (!widget.startEmpty) {
+      _loadDefaultPreset();
+    }
+    _loadProfile();
+  }
+
+  void _loadProfile() async {
+    try {
+      final p = await StorageService.instance.getProfile();
+      if (mounted) setState(() => _technicianProfile = p);
+    } catch (_) {}
   }
 
   void _loadDefaultPreset() {
@@ -266,8 +280,10 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       projectTitle: 'Field Conduit Run #1',
       clientName: 'Commercial Client',
       siteAddress: 'Facility Electrical Room B',
-      technicianName: 'Carlos Mendoza',
-      companyName: 'VoltPro Electrical LLC',
+      technicianName: _technicianProfile.technicianName,
+      companyName: _technicianProfile.companyName,
+      licenseNumber: _technicianProfile.licenseNumber,
+      agencyName: _technicianProfile.agencyName,
       date: DateTime.now(),
       raceway: _currentRacewayProfile,
       conductors: List.unmodifiable(_conductorGroups),
@@ -691,6 +707,23 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
         title: const Text('ElectroNorm Pro'),
         actions: [
           IconButton(
+            key: const Key('btnClearCalculation'),
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Limpiar / Nuevo',
+            onPressed: () {
+              setState(() {
+                _conductorGroups.clear();
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Cálculo limpiado'),
+                  duration: Duration(seconds: 1),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+          ),
+          IconButton(
             key: const Key('btnSavedProjectsAppBar'),
             icon: const Icon(Icons.folder_special_outlined),
             tooltip: 'Saved Projects',
@@ -713,6 +746,17 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             icon: const Icon(Icons.workspace_premium_outlined, color: AppColors.caution),
             tooltip: 'ElectroNorm Pro',
             onPressed: _openPaywall,
+          ),
+          IconButton(
+            key: const Key('btnSettingsAppBar'),
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Ajustes / Perfil Técnico',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
+            },
           ),
           IconButton(
             icon: const Icon(Icons.refresh),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
-import 'screens/calculator_screen.dart';
+import 'screens/welcome_landing_screen.dart';
+import 'services/storage_service.dart';
 import 'theme/app_theme.dart';
 
 void main() {
@@ -8,52 +10,34 @@ void main() {
 }
 
 /// Primary application widget for ElectroNorm Pro, initialized with
-/// high-contrast dark field theme and launching directly into CalculatorScreen.
+/// high-contrast dark field theme and reactive localization.
 class ElectroNormApp extends StatelessWidget {
   const ElectroNormApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ElectroNorm Pro',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      home: const CalculatorScreen(),
-    );
-  }
-}
-
-/// Backward-compatible widget harness supporting legacy test runner
-class MyApp extends StatefulWidget {
-  const MyApp({super.key});
-
-  @override
-  State<MyApp> createState() => _MyAppState();
-}
-
-class _MyAppState extends State<MyApp> {
-  int _counter = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ElectroNorm Pro',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
-      home: Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text('$_counter'),
-              IconButton(
-                icon: const Icon(Icons.add),
-                onPressed: () => setState(() => _counter++),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return AnimatedBuilder(
+      animation: StorageService.instance,
+      builder: (context, _) {
+        final localeCode = StorageService.instance.localeCode;
+        return MaterialApp(
+          title: 'ElectroNorm Pro',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.darkTheme,
+          locale: Locale(localeCode),
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: const [
+            Locale('es'),
+            Locale('en'),
+            Locale('pt'),
+          ],
+          home: const WelcomeLandingScreen(),
+        );
+      },
     );
   }
 }

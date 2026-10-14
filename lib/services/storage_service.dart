@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
 import '../catalogs/raceway_catalog.dart';
+import '../l10n/app_strings.dart';
 import '../models/calculation_results.dart';
 import '../models/conductor.dart';
 import '../models/raceway.dart';
@@ -19,13 +21,13 @@ class TechnicianProfile {
   final String address;
 
   const TechnicianProfile({
-    this.technicianName = 'Carlos Mendoza',
-    this.companyName = 'VoltPro Electrical LLC',
-    this.licenseNumber = 'ME-948210',
-    this.email = 'carlos@voltpro.com',
-    this.phone = '(555) 382-9102',
-    this.agencyName = 'City Electrical Inspection Bureau',
-    this.address = '104 Industrial Pkwy, Suite B',
+    this.technicianName = '',
+    this.companyName = '',
+    this.licenseNumber = '',
+    this.email = '',
+    this.phone = '',
+    this.agencyName = '',
+    this.address = '',
   });
 
   TechnicianProfile copyWith({
@@ -60,13 +62,13 @@ class TechnicianProfile {
 
   factory TechnicianProfile.fromJson(Map<String, dynamic> json) {
     return TechnicianProfile(
-      technicianName: json['technicianName'] as String? ?? 'Carlos Mendoza',
-      companyName: json['companyName'] as String? ?? 'VoltPro Electrical LLC',
-      licenseNumber: json['licenseNumber'] as String? ?? 'ME-948210',
-      email: json['email'] as String? ?? 'carlos@voltpro.com',
-      phone: json['phone'] as String? ?? '(555) 382-9102',
-      agencyName: json['agencyName'] as String? ?? 'City Electrical Inspection Bureau',
-      address: json['address'] as String? ?? '104 Industrial Pkwy, Suite B',
+      technicianName: json['technicianName'] as String? ?? '',
+      companyName: json['companyName'] as String? ?? '',
+      licenseNumber: json['licenseNumber'] as String? ?? '',
+      email: json['email'] as String? ?? '',
+      phone: json['phone'] as String? ?? '',
+      agencyName: json['agencyName'] as String? ?? '',
+      address: json['address'] as String? ?? '',
     );
   }
 
@@ -260,9 +262,14 @@ class SavedCalculation {
 }
 
 /// Abstract StorageService interface contract
-abstract class StorageService {
+abstract class StorageService implements Listenable {
   /// Global singleton instance
   static StorageService instance = SharedPreferencesStorageService();
+
+  // Localization
+  String get localeCode;
+  Future<void> setLocale(String code);
+  AppStrings get strings;
 
   // Saved Calculations
   Future<List<SavedCalculation>> getSavedCalculations();
@@ -289,23 +296,57 @@ abstract class StorageService {
 }
 
 /// Concrete SharedPreferences-backed StorageService
-class SharedPreferencesStorageService implements StorageService {
+class SharedPreferencesStorageService extends ChangeNotifier implements StorageService {
   static const String _keyCalculations = 'electronorm_saved_calculations';
   static const String _keyProfile = 'electronorm_technician_profile';
   static const String _keyIsPro = 'electronorm_is_pro_subscriber';
   static const String _keyTier = 'electronorm_subscription_tier';
   static const String _keyTrialStart = 'electronorm_trial_start_date';
   static const String _keyDemoMode = 'electronorm_demo_mode';
+  static const String _keyLocale = 'electronorm_locale_code';
 
   final SharedPreferences? _injectedPrefs;
+  String _localeCode = 'es';
+  bool _localeInitialized = false;
 
-  SharedPreferencesStorageService([this._injectedPrefs]);
+  SharedPreferencesStorageService([this._injectedPrefs]) {
+    if (_injectedPrefs != null) {
+      _localeCode = _injectedPrefs.getString(_keyLocale) ?? 'es';
+      _localeInitialized = true;
+    }
+  }
 
   /// Global static accessor
   static StorageService instance = SharedPreferencesStorageService();
 
+  @override
+  String get localeCode => _localeCode;
+
+  @override
+  AppStrings get strings => AppStrings.get(_localeCode);
+
+  @override
+  Future<void> setLocale(String code) async {
+    if (_localeCode == code) return;
+    _localeCode = code;
+    _localeInitialized = true;
+    final prefs = await _getPrefs();
+    await prefs.setString(_keyLocale, code);
+    notifyListeners();
+  }
+
   Future<SharedPreferences> _getPrefs() async {
-    return _injectedPrefs ?? await SharedPreferences.getInstance();
+    final prefs = _injectedPrefs ?? await SharedPreferences.getInstance();
+    if (!_localeInitialized) {
+      _localeInitialized = true;
+      if (prefs.containsKey(_keyLocale)) {
+        final saved = prefs.getString(_keyLocale);
+        if (saved != null && saved.isNotEmpty) {
+          _localeCode = saved;
+        }
+      }
+    }
+    return prefs;
   }
 
   // --- Saved Calculations ---
@@ -379,6 +420,9 @@ class SharedPreferencesStorageService implements StorageService {
     await prefs.remove(_keyTier);
     await prefs.remove(_keyTrialStart);
     await prefs.remove(_keyDemoMode);
+    await prefs.remove(_keyLocale);
+    _localeCode = 'es';
+    notifyListeners();
   }
 
   // --- Technician Profile ---
@@ -405,6 +449,7 @@ class SharedPreferencesStorageService implements StorageService {
   Future<void> saveProfile(TechnicianProfile profile) async {
     final prefs = await _getPrefs();
     await prefs.setString(_keyProfile, jsonEncode(profile.toJson()));
+    notifyListeners();
   }
 
   // --- Pro Subscription & Store Monetization ---
@@ -436,6 +481,7 @@ class SharedPreferencesStorageService implements StorageService {
         await prefs.setString(_keyTier, 'annual');
       }
     }
+    notifyListeners();
   }
 
   @override
@@ -452,6 +498,7 @@ class SharedPreferencesStorageService implements StorageService {
     } else {
       await prefs.setString(_keyTier, tier);
     }
+    notifyListeners();
   }
 
   @override
@@ -472,6 +519,7 @@ class SharedPreferencesStorageService implements StorageService {
     await prefs.setString(_keyTrialStart, DateTime.now().toIso8601String());
     await prefs.setString(_keyTier, 'trial_14d');
     await prefs.setBool(_keyIsPro, true);
+    notifyListeners();
   }
 
   @override
@@ -508,6 +556,7 @@ class SharedPreferencesStorageService implements StorageService {
     if (enabled) {
       await prefs.setBool(_keyIsPro, true);
     }
+    notifyListeners();
   }
 }
 

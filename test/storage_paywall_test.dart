@@ -166,9 +166,9 @@ void main() {
     test('4. TechnicianProfile save and retrieve with defaults fallback', () async {
       // Uninitialized profile returns default
       final defaultProfile = await storageService.getProfile();
-      expect(defaultProfile.technicianName, equals('Carlos Mendoza'));
-      expect(defaultProfile.companyName, equals('VoltPro Electrical LLC'));
-      expect(defaultProfile.licenseNumber, equals('ME-948210'));
+      expect(defaultProfile.technicianName, equals(''));
+      expect(defaultProfile.companyName, equals(''));
+      expect(defaultProfile.licenseNumber, equals(''));
 
       // Save custom profile
       const customProfile = TechnicianProfile(
@@ -201,7 +201,7 @@ void main() {
       expect(calculations, isEmpty);
 
       final profile = await freshStorage.getProfile();
-      expect(profile.technicianName, equals('Carlos Mendoza')); // Fallback to defaultProfile
+      expect(profile.technicianName, equals('')); // Fallback to defaultProfile
     });
 
     test('6. Partial corrupted list: recovers valid items and drops corrupted items safely', () async {

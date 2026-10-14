@@ -1,30 +1,29 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:electronorm/main.dart';
+import 'package:electronorm/screens/calculator_screen.dart';
+import 'package:electronorm/screens/welcome_landing_screen.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
+  testWidgets('ElectroNormApp boots cleanly into WelcomeLandingScreen and enters CalculatorScreen', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+    await tester.pumpWidget(const ElectroNormApp());
+    await tester.pumpAndSettle();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // Verify that WelcomeLandingScreen is mounted with minimalist brand elements
+    expect(find.byType(WelcomeLandingScreen), findsOneWidget);
+    expect(find.text('ELECTRONORM'), findsOneWidget);
+    expect(find.byKey(const Key('btnWelcomeEnter')), findsOneWidget);
+    expect(find.byKey(const Key('btnWelcomeNewCalculation')), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    // Tap "Entrar" to enter CalculatorScreen
+    await tester.tap(find.byKey(const Key('btnWelcomeEnter')));
+    await tester.pumpAndSettle();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    // Verify CalculatorScreen is mounted and starts empty
+    expect(find.byType(CalculatorScreen), findsOneWidget);
+    expect(find.text('0 conductors packed'), findsOneWidget);
   });
 }
+

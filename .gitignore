@@ -49,3 +49,9 @@ app.*.map.json
 
 # Teamwork Agent Metadata
 .agents/
+
+# Keystore & Signing Secrets
+android/key.properties
+*.jks
+*.keystore
+
