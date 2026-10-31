@@ -19,6 +19,7 @@ class TechnicianProfile {
   final String phone;
   final String agencyName;
   final String address;
+  final String? defaultSignatureBase64;
 
   const TechnicianProfile({
     this.technicianName = '',
@@ -28,7 +29,19 @@ class TechnicianProfile {
     this.phone = '',
     this.agencyName = '',
     this.address = '',
+    this.defaultSignatureBase64,
   });
+
+  Uint8List? get defaultSignatureBytes {
+    if (defaultSignatureBase64 == null || defaultSignatureBase64!.isEmpty) {
+      return null;
+    }
+    try {
+      return base64Decode(defaultSignatureBase64!);
+    } catch (_) {
+      return null;
+    }
+  }
 
   TechnicianProfile copyWith({
     String? technicianName,
@@ -38,6 +51,8 @@ class TechnicianProfile {
     String? phone,
     String? agencyName,
     String? address,
+    String? defaultSignatureBase64,
+    bool clearDefaultSignature = false,
   }) {
     return TechnicianProfile(
       technicianName: technicianName ?? this.technicianName,
@@ -47,6 +62,9 @@ class TechnicianProfile {
       phone: phone ?? this.phone,
       agencyName: agencyName ?? this.agencyName,
       address: address ?? this.address,
+      defaultSignatureBase64: clearDefaultSignature
+          ? null
+          : (defaultSignatureBase64 ?? this.defaultSignatureBase64),
     );
   }
 
@@ -58,6 +76,7 @@ class TechnicianProfile {
         'phone': phone,
         'agencyName': agencyName,
         'address': address,
+        'defaultSignatureBase64': defaultSignatureBase64,
       };
 
   factory TechnicianProfile.fromJson(Map<String, dynamic> json) {
@@ -69,6 +88,7 @@ class TechnicianProfile {
       phone: json['phone'] as String? ?? '',
       agencyName: json['agencyName'] as String? ?? '',
       address: json['address'] as String? ?? '',
+      defaultSignatureBase64: json['defaultSignatureBase64'] as String?,
     );
   }
 
@@ -271,6 +291,10 @@ abstract class StorageService implements Listenable {
   Future<void> setLocale(String code);
   AppStrings get strings;
 
+  // Onboarding
+  Future<bool> hasSeenOnboarding();
+  Future<void> setHasSeenOnboarding(bool value);
+
   // Saved Calculations
   Future<List<SavedCalculation>> getSavedCalculations();
   Future<SavedCalculation?> getCalculationById(String id);
@@ -304,6 +328,7 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
   static const String _keyTrialStart = 'electronorm_trial_start_date';
   static const String _keyDemoMode = 'electronorm_demo_mode';
   static const String _keyLocale = 'electronorm_locale_code';
+  static const String _keyOnboarding = 'electronorm_has_seen_onboarding';
 
   final SharedPreferences? _injectedPrefs;
   String _localeCode = 'es';
@@ -332,6 +357,23 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
     _localeInitialized = true;
     final prefs = await _getPrefs();
     await prefs.setString(_keyLocale, code);
+    notifyListeners();
+  }
+
+  @override
+  Future<bool> hasSeenOnboarding() async {
+    try {
+      final prefs = await _getPrefs();
+      return prefs.getBool(_keyOnboarding) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  @override
+  Future<void> setHasSeenOnboarding(bool value) async {
+    final prefs = await _getPrefs();
+    await prefs.setBool(_keyOnboarding, value);
     notifyListeners();
   }
 
@@ -400,6 +442,7 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
     final prefs = await _getPrefs();
     final encoded = jsonEncode(all.map((e) => e.toJson()).toList());
     await prefs.setString(_keyCalculations, encoded);
+    notifyListeners();
   }
 
   @override
@@ -409,6 +452,7 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
     final prefs = await _getPrefs();
     final encoded = jsonEncode(all.map((e) => e.toJson()).toList());
     await prefs.setString(_keyCalculations, encoded);
+    notifyListeners();
   }
 
   @override
@@ -421,6 +465,7 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
     await prefs.remove(_keyTrialStart);
     await prefs.remove(_keyDemoMode);
     await prefs.remove(_keyLocale);
+    await prefs.remove(_keyOnboarding);
     _localeCode = 'es';
     notifyListeners();
   }

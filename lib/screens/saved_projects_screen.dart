@@ -5,6 +5,7 @@ import '../models/raceway.dart';
 import '../services/pdf_report_service.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/stat_card.dart';
 import 'report_preview_screen.dart';
 
 enum SortOption {
@@ -23,7 +24,14 @@ enum FilterOption {
 }
 
 class SavedProjectsScreen extends StatefulWidget {
-  const SavedProjectsScreen({super.key});
+  final ValueChanged<SavedCalculation>? onSelectProject;
+  final VoidCallback? onBackToCalculator;
+
+  const SavedProjectsScreen({
+    super.key,
+    this.onSelectProject,
+    this.onBackToCalculator,
+  });
 
   @override
   State<SavedProjectsScreen> createState() => _SavedProjectsScreenState();
@@ -41,10 +49,16 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
   void initState() {
     super.initState();
     _loadCalculations();
+    StorageService.instance.addListener(_onStorageChanged);
+  }
+
+  void _onStorageChanged() {
+    _loadCalculations();
   }
 
   @override
   void dispose() {
+    StorageService.instance.removeListener(_onStorageChanged);
     _searchController.dispose();
     super.dispose();
   }
@@ -145,6 +159,7 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
       ambientTempC: item.ambientTempC,
       terminalRatingC: item.terminalRatingC,
       cccCount: ccc,
+      signaturePngBytes: profile.defaultSignatureBytes,
     );
 
     if (mounted) {
@@ -211,6 +226,11 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
   @override
   Widget build(BuildContext context) {
     final items = _filteredAndSortedCalculations;
+    final compliantCount =
+        _allCalculations.where((c) => c.fillResult.fillPercentage <= 40.0).length;
+    final alertCount = _allCalculations
+        .where((c) => c.fillResult.fillPercentage > 40.0 || c.fillResult.hasJamRisk)
+        .length;
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
@@ -248,9 +268,40 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
           ? const Center(child: CircularProgressIndicator(color: AppColors.compliant))
           : Column(
               children: [
+                // KPI StatCards row (FieldQuote style) when projects exist and screen height is sufficient
+                if (_allCalculations.isNotEmpty &&
+                    MediaQuery.of(context).size.height >= 700)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: StatCard(
+                            title: 'Proyectos',
+                            value: '${_allCalculations.length}',
+                            subtitle: '$compliantCount Cumplen NEC',
+                            icon: Icons.check_circle_outline_rounded,
+                            accentColor: AppTheme.success,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: StatCard(
+                            title: 'En Alerta',
+                            value: '$alertCount',
+                            subtitle: alertCount == 0 ? '0 Violaciones' : 'Revisar Llenado',
+                            icon: Icons.warning_amber_rounded,
+                            accentColor:
+                                alertCount == 0 ? AppTheme.accent : AppTheme.warning,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // Search Bar
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
                   child: TextField(
                     key: const Key('inputSearchProjects'),
                     controller: _searchController,
@@ -351,10 +402,11 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
 
   Widget _buildEmptyState() {
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
               padding: const EdgeInsets.all(20),
@@ -399,7 +451,13 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
               ),
               icon: const Icon(Icons.arrow_back, size: 18),
               label: const Text('Back to Calculator', style: TextStyle(fontWeight: FontWeight.bold)),
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () {
+                if (widget.onBackToCalculator != null) {
+                  widget.onBackToCalculator!();
+                } else if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
+              },
             ),
           ],
         ),
@@ -448,8 +506,11 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
           key: Key('cardProject_${item.id}'),
           borderRadius: BorderRadius.circular(14),
           onTap: () {
-            // Tap on card loads calculation back into CalculatorScreen
-            Navigator.of(context).pop(item);
+            if (widget.onSelectProject != null) {
+              widget.onSelectProject!(item);
+            } else {
+              Navigator.of(context).pop(item);
+            }
           },
           child: Padding(
             padding: const EdgeInsets.all(16),

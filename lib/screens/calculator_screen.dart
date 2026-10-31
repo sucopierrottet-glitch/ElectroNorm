@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-
+import 'package:uuid/uuid.dart';
 import '../calculators/conduit_fill_calculator.dart';
 import '../calculators/derating_calculator.dart';
 import '../calculators/jam_ratio_calculator.dart';
@@ -9,12 +9,11 @@ import '../catalogs/raceway_catalog.dart';
 import '../models/calculation_results.dart';
 import '../models/conductor.dart';
 import '../models/raceway.dart';
-import '../theme/app_theme.dart';
-import '../widgets/raceway_painter.dart';
-import 'package:uuid/uuid.dart';
-
 import '../services/pdf_report_service.dart';
 import '../services/storage_service.dart';
+import '../theme/app_theme.dart';
+import '../widgets/onboarding_dialog.dart';
+import '../widgets/raceway_painter.dart';
 import 'paywall_screen.dart';
 import 'report_preview_screen.dart';
 import 'saved_projects_screen.dart';
@@ -22,13 +21,21 @@ import 'settings_screen.dart';
 
 class CalculatorScreen extends StatefulWidget {
   final bool startEmpty;
-  const CalculatorScreen({super.key, this.startEmpty = false});
+  final VoidCallback? onOpenProjectsTab;
+  final VoidCallback? onOpenSettingsTab;
+
+  const CalculatorScreen({
+    super.key,
+    this.startEmpty = false,
+    this.onOpenProjectsTab,
+    this.onOpenSettingsTab,
+  });
 
   @override
-  State<CalculatorScreen> createState() => _CalculatorScreenState();
+  State<CalculatorScreen> createState() => CalculatorScreenState();
 }
 
-class _CalculatorScreenState extends State<CalculatorScreen> {
+class CalculatorScreenState extends State<CalculatorScreen> {
   // Raceway Selection
   RacewayType _selectedRacewayType = RacewayType.emt;
   String _selectedTradeSize = '3/4';
@@ -36,6 +43,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
   // Conductor Schedule
   final List<ConductorGroup> _conductorGroups = [];
+
+  // Progressive disclosure flags:
+  // When startEmpty is true (real user session), advanced modules start hidden
+  // so the user progressively adds them as they use the calculator.
+  late bool _showPresets;
+  late bool _showVoltageDrop;
+  late bool _showThermalDerating;
 
   // Voltage Drop Parameters
   CircuitPhase _circuitPhase = CircuitPhase.singlePhase;
@@ -48,27 +62,158 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   double _ambientTempC = 30.0;
   double _terminalRatingC = 75.0;
 
+  // Subscription & Profile state
+  bool _isProSubscriber = false;
   TechnicianProfile _technicianProfile = TechnicianProfile.defaultProfile;
+
+  String _tr(String es, String en, String pt) {
+    final lang = StorageService.instance.localeCode;
+    if (lang.startsWith('en')) return en;
+    if (lang.startsWith('pt')) return pt;
+    return es;
+  }
 
   @override
   void initState() {
     super.initState();
+    _showPresets = !widget.startEmpty;
+    _showVoltageDrop = !widget.startEmpty;
+    _showThermalDerating = !widget.startEmpty;
+
     if (!widget.startEmpty) {
       _loadDefaultPreset();
     }
-    _loadProfile();
+    _refreshSubscriptionState();
+    StorageService.instance.addListener(_onStorageChanged);
   }
 
-  void _loadProfile() async {
+  void _onStorageChanged() {
+    _refreshSubscriptionState();
+  }
+
+  @override
+  void dispose() {
+    StorageService.instance.removeListener(_onStorageChanged);
+    super.dispose();
+  }
+
+  Future<void> _refreshSubscriptionState() async {
     try {
+      final isPro = await StorageService.instance.isProSubscriber();
       final p = await StorageService.instance.getProfile();
-      if (mounted) setState(() => _technicianProfile = p);
+      if (mounted) {
+        setState(() {
+          _isProSubscriber = isPro;
+          _technicianProfile = p;
+        });
+      }
     } catch (_) {}
+  }
+
+  /// Public method to load a saved calculation from HomeNavigationScreen or SavedProjectsScreen
+  void loadSavedCalculation(SavedCalculation calc) {
+    setState(() {
+      _selectedRacewayType = calc.raceway.type;
+      _selectedTradeSize = calc.raceway.tradeSize;
+      _isNipple = calc.isNipple;
+      _conductorGroups.clear();
+      _conductorGroups.addAll(calc.conductors);
+      _nominalVoltage = calc.nominalVoltage;
+      _circuitPhase = calc.circuitPhase;
+      _circuitLengthFeet = calc.circuitLengthFeet;
+      _loadCurrentAmps = calc.loadCurrentAmps;
+      _powerFactor = calc.powerFactor;
+      _ambientTempC = calc.ambientTempC;
+      _terminalRatingC = calc.terminalRatingC;
+      if (calc.voltageDropResult != null) _showVoltageDrop = true;
+      if (calc.deratingResult != null) _showThermalDerating = true;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.surfaceElevated,
+          content: Text(
+            'Loaded "${calc.title}" into calculator',
+            style: const TextStyle(color: AppColors.textPrimary),
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  /// Public method to add a conductor directly from NecCatalogScreen
+  void addConductorFromCatalog(ConductorSpec spec) {
+    setState(() {
+      _conductorGroups.add(
+        ConductorGroup(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          spec: spec,
+          count: 1,
+          role: 'phaseA',
+        ),
+      );
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.success,
+          content: Text(
+            _tr(
+              'Conductor ${spec.gauge} agregado al cálculo',
+              'Added ${spec.gauge} conductor to calculation',
+              'Condutor ${spec.gauge} adicionado ao cálculo',
+            ),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  /// Public method to select a raceway directly from NecCatalogScreen
+  void selectRacewayFromCatalog(RacewayProfile profile) {
+    setState(() {
+      _selectedRacewayType = profile.type;
+      _selectedTradeSize = profile.tradeSize;
+    });
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppTheme.primary,
+          content: Text(
+            _tr(
+              'Tubería seleccionada: ${profile.tradeSize}" ${profile.type.displayName}',
+              'Selected raceway: ${profile.tradeSize}" ${profile.type.displayName}',
+              'Eletroduto selecionado: ${profile.tradeSize}" ${profile.type.displayName}',
+            ),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  /// Public method to reset to a clean progressive state
+  void resetToNewCalculation() {
+    setState(() {
+      _conductorGroups.clear();
+      _selectedRacewayType = RacewayType.emt;
+      _selectedTradeSize = '3/4';
+      _isNipple = false;
+      if (widget.startEmpty) {
+        _showPresets = false;
+        _showVoltageDrop = false;
+        _showThermalDerating = false;
+      }
+    });
   }
 
   void _loadDefaultPreset() {
     _conductorGroups.clear();
-    // Default: 3x #10 AWG THHN Cu + 1x #12 AWG Ground
     final spec10 = ConductorCatalog.getSpec(
       gauge: '10 AWG',
       insulation: ConductorInsulation.thhn,
@@ -124,11 +269,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
   /// so that entering 3 separate phase wires correctly evaluates jam risk!
   JamRatioResult? get _aggregatedJamCheck {
     final profile = _currentRacewayProfile;
-    // Map of outside diameter -> total count
     final diameterCounts = <double, int>{};
     for (final group in _conductorGroups) {
       if (group.count <= 0) continue;
-      // Round to 4 decimal places for floating point grouping
       final od = double.parse(group.spec.outerDiameterInches.toStringAsFixed(4));
       diameterCounts[od] = (diameterCounts[od] ?? 0) + group.count;
     }
@@ -298,6 +441,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       ambientTempC: _ambientTempC,
       terminalRatingC: _terminalRatingC,
       cccCount: _calculatedCccCount,
+      signaturePngBytes: _technicianProfile.defaultSignatureBytes,
     );
 
     Navigator.of(context).push(
@@ -312,7 +456,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
       MaterialPageRoute(builder: (ctx) => const SavedProjectsScreen()),
     );
     if (selected != null && mounted) {
-      _loadSavedCalculation(selected);
+      loadSavedCalculation(selected);
     }
   }
 
@@ -320,39 +464,13 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
     );
-  }
-
-  void _loadSavedCalculation(SavedCalculation calc) {
-    setState(() {
-      _selectedRacewayType = calc.raceway.type;
-      _selectedTradeSize = calc.raceway.tradeSize;
-      _isNipple = calc.isNipple;
-      _conductorGroups.clear();
-      _conductorGroups.addAll(calc.conductors);
-      _nominalVoltage = calc.nominalVoltage;
-      _circuitPhase = calc.circuitPhase;
-      _circuitLengthFeet = calc.circuitLengthFeet;
-      _loadCurrentAmps = calc.loadCurrentAmps;
-      _powerFactor = calc.powerFactor;
-      _ambientTempC = calc.ambientTempC;
-      _terminalRatingC = calc.terminalRatingC;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: AppColors.surfaceElevated,
-        content: Text(
-          'Loaded "${calc.title}" into calculator',
-          style: const TextStyle(color: AppColors.textPrimary),
-        ),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    await _refreshSubscriptionState();
   }
 
   Future<void> _showSaveCalculationDialog() async {
     final totalConds = _conductorGroups.fold(0, (sum, g) => sum + g.count);
-    final defaultTitle = 'Run #${totalConds}W - ${_currentRacewayProfile.tradeSize}" ${_currentRacewayProfile.type.displayName}';
+    final defaultTitle =
+        'Run #${totalConds}W - ${_currentRacewayProfile.tradeSize}" ${_currentRacewayProfile.type.displayName}';
     final titleController = TextEditingController(text: defaultTitle);
     final clientController = TextEditingController();
     final notesController = TextEditingController();
@@ -366,7 +484,12 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           children: [
             Icon(Icons.bookmark_add, color: AppColors.compliant, size: 24),
             SizedBox(width: 8),
-            Text('Save Calculation Run', style: TextStyle(color: AppColors.textPrimary, fontSize: 18)),
+            Expanded(
+              child: Text(
+                'Save Calculation Run',
+                style: TextStyle(color: AppColors.textPrimary, fontSize: 18),
+              ),
+            ),
           ],
         ),
         content: SingleChildScrollView(
@@ -418,7 +541,9 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               foregroundColor: Colors.black,
             ),
             onPressed: () async {
-              final title = titleController.text.trim().isEmpty ? 'Conduit Run' : titleController.text.trim();
+              final title = titleController.text.trim().isEmpty
+                  ? 'Conduit Run'
+                  : titleController.text.trim();
               final now = DateTime.now();
               final savedItem = SavedCalculation(
                 id: const Uuid().v4(),
@@ -552,11 +677,16 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     Wrap(
                       spacing: 8,
                       children: [
-                        _buildRoleChip('phaseA', 'Phase A', selectedRole, (r) => setDialogState(() => selectedRole = r)),
-                        _buildRoleChip('phaseB', 'Phase B', selectedRole, (r) => setDialogState(() => selectedRole = r)),
-                        _buildRoleChip('phaseC', 'Phase C', selectedRole, (r) => setDialogState(() => selectedRole = r)),
-                        _buildRoleChip('neutral', 'Neutral', selectedRole, (r) => setDialogState(() => selectedRole = r)),
-                        _buildRoleChip('ground', 'Ground', selectedRole, (r) => setDialogState(() => selectedRole = r)),
+                        _buildRoleChip('phaseA', 'Phase A', selectedRole,
+                            (r) => setDialogState(() => selectedRole = r)),
+                        _buildRoleChip('phaseB', 'Phase B', selectedRole,
+                            (r) => setDialogState(() => selectedRole = r)),
+                        _buildRoleChip('phaseC', 'Phase C', selectedRole,
+                            (r) => setDialogState(() => selectedRole = r)),
+                        _buildRoleChip('neutral', 'Neutral', selectedRole,
+                            (r) => setDialogState(() => selectedRole = r)),
+                        _buildRoleChip('ground', 'Ground', selectedRole,
+                            (r) => setDialogState(() => selectedRole = r)),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -619,11 +749,14 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     Row(
                       children: [
                         const Text('Quantity:',
-                            style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+                            style: TextStyle(
+                                color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
                         const Spacer(),
                         IconButton(
-                          icon: const Icon(Icons.remove_circle_outline, color: AppColors.textSecondary),
-                          onPressed: quantity > 1 ? () => setDialogState(() => quantity--) : null,
+                          icon: const Icon(Icons.remove_circle_outline,
+                              color: AppColors.textSecondary),
+                          onPressed:
+                              quantity > 1 ? () => setDialogState(() => quantity--) : null,
                         ),
                         Text(
                           '$quantity',
@@ -655,7 +788,7 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                           );
                           setState(() {
                             _conductorGroups.add(ConductorGroup(
-                              id: DateTime.now().millisecondsSinceEpoch.toString(),
+                              id: DateTime.now().microsecondsSinceEpoch.toString(),
                               spec: spec,
                               count: quantity,
                               role: selectedRole,
@@ -675,7 +808,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     );
   }
 
-  Widget _buildRoleChip(String role, String label, String currentRole, Function(String) onSelect) {
+  Widget _buildRoleChip(
+      String role, String label, String currentRole, Function(String) onSelect) {
     final isSelected = role == currentRole;
     final color = AppColors.getConductorColor(role);
     return ChoiceChip(
@@ -701,19 +835,119 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
     final raceway = _currentRacewayProfile;
     final vDrop = _voltageDropResult;
     final derate = _deratingResult;
+    final hasSubtitle = _technicianProfile.companyName.isNotEmpty ||
+        _technicianProfile.technicianName.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ElectroNorm Pro'),
+        titleSpacing: 16,
+        title: GestureDetector(
+          onTap: () async {
+            if (_technicianProfile.companyName.isEmpty &&
+                _technicianProfile.technicianName.isEmpty) {
+              await showDialog(
+                context: context,
+                builder: (_) => OnboardingDialog(storageService: StorageService.instance),
+              );
+              await _refreshSubscriptionState();
+            } else if (widget.onOpenSettingsTab != null) {
+              widget.onOpenSettingsTab!();
+            } else {
+              await Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
+              await _refreshSubscriptionState();
+            }
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'ElectroNorm Pro',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              ),
+              Text(
+                hasSubtitle
+                    ? (_technicianProfile.companyName.isNotEmpty
+                        ? _technicianProfile.companyName
+                        : _technicianProfile.technicianName)
+                    : _tr(
+                        'Configurar Perfil Técnico ▾',
+                        'Set Up Technician Profile ▾',
+                        'Configurar Perfil Técnico ▾',
+                      ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppTheme.accent,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
         actions: [
+          // FieldQuote-style PRO Pill Badge
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: InkWell(
+              key: const Key('btnPaywallAppBar'),
+              onTap: _openPaywall,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  gradient: _isProSubscriber
+                      ? const LinearGradient(
+                          colors: [Color(0xFF059669), Color(0xFF047857)],
+                        )
+                      : LinearGradient(
+                          colors: [
+                            const Color(0xFFF59E0B).withValues(alpha: 0.2),
+                            const Color(0xFFD97706).withValues(alpha: 0.2),
+                          ],
+                        ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: _isProSubscriber
+                        ? AppTheme.success
+                        : const Color(0xFFF59E0B).withValues(alpha: 0.5),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _isProSubscriber
+                          ? Icons.verified_rounded
+                          : Icons.workspace_premium_rounded,
+                      size: 14,
+                      color: _isProSubscriber ? Colors.white : const Color(0xFFFBBF24),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'PRO',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: _isProSubscriber ? Colors.white : const Color(0xFFFBBF24),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
           IconButton(
             key: const Key('btnClearCalculation'),
-            icon: const Icon(Icons.refresh_rounded),
+            icon: const Icon(Icons.refresh_rounded, size: 20),
             tooltip: 'Limpiar / Nuevo',
             onPressed: () {
-              setState(() {
-                _conductorGroups.clear();
-              });
+              resetToNewCalculation();
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Cálculo limpiado'),
@@ -725,43 +959,37 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
           ),
           IconButton(
             key: const Key('btnSavedProjectsAppBar'),
-            icon: const Icon(Icons.folder_special_outlined),
+            icon: const Icon(Icons.folder_special_outlined, size: 20),
             tooltip: 'Saved Projects',
             onPressed: _openSavedProjects,
           ),
           IconButton(
             key: const Key('btnExportPdfAppBar'),
-            icon: const Icon(Icons.picture_as_pdf_outlined),
+            icon: const Icon(Icons.picture_as_pdf_outlined, size: 20),
             tooltip: 'Export PDF / Sign Report',
             onPressed: _openReportPreview,
           ),
           IconButton(
             key: const Key('btnSaveProject'),
-            icon: const Icon(Icons.bookmark_add_outlined),
+            icon: const Icon(Icons.bookmark_add_outlined, size: 20),
             tooltip: 'Save Calculation',
             onPressed: _showSaveCalculationDialog,
           ),
           IconButton(
-            key: const Key('btnPaywallAppBar'),
-            icon: const Icon(Icons.workspace_premium_outlined, color: AppColors.caution),
-            tooltip: 'ElectroNorm Pro',
-            onPressed: _openPaywall,
-          ),
-          IconButton(
             key: const Key('btnSettingsAppBar'),
-            icon: const Icon(Icons.settings_outlined),
+            icon: const Icon(Icons.tune_rounded, size: 20),
             tooltip: 'Ajustes / Perfil Técnico',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
-              );
+            onPressed: () async {
+              if (widget.onOpenSettingsTab != null) {
+                widget.onOpenSettingsTab!();
+              } else {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                );
+                await _refreshSubscriptionState();
+              }
             },
-          ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Reset to default preset',
-            onPressed: _loadDefaultPreset,
           ),
         ],
       ),
@@ -807,45 +1035,61 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                   ),
                 ),
 
-              // Quick Presets Row
-              const Text(
-                'Quick Presets',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.4,
-                ),
-              ),
-              const SizedBox(height: 6),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
+              // Quick Presets Row (Progressive Disclosure)
+              if (_showPresets) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    ActionChip(
-                      label: const Text('3x #10 + 1x #12 Grd'),
-                      onPressed: () => _applyPreset('preset_3x10_1x12'),
+                    const Text(
+                      'Quick Presets',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.4,
+                      ),
                     ),
-                    const SizedBox(width: 6),
-                    ActionChip(
-                      label: const Text('3x 500k + 1x #3 Grd'),
-                      onPressed: () => _applyPreset('preset_3x500_1x3'),
-                    ),
-                    const SizedBox(width: 6),
-                    ActionChip(
-                      label: const Text('4x #12 Branch'),
-                      onPressed: () => _applyPreset('preset_4x12_branch'),
-                    ),
-                    const SizedBox(width: 6),
-                    ActionChip(
-                      label: const Text('3x 4/0 Service'),
-                      onPressed: () => _applyPreset('preset_3x40_service'),
-                    ),
+                    if (widget.startEmpty)
+                      InkWell(
+                        onTap: () => setState(() => _showPresets = false),
+                        borderRadius: BorderRadius.circular(12),
+                        child: const Padding(
+                          padding: EdgeInsets.all(4.0),
+                          child: Icon(Icons.close_rounded,
+                              size: 16, color: AppColors.textSecondary),
+                        ),
+                      ),
                   ],
                 ),
-              ),
-
-              const SizedBox(height: 14),
+                const SizedBox(height: 6),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      ActionChip(
+                        label: const Text('3x #10 + 1x #12 Grd'),
+                        onPressed: () => _applyPreset('preset_3x10_1x12'),
+                      ),
+                      const SizedBox(width: 6),
+                      ActionChip(
+                        label: const Text('3x 500k + 1x #3 Grd'),
+                        onPressed: () => _applyPreset('preset_3x500_1x3'),
+                      ),
+                      const SizedBox(width: 6),
+                      ActionChip(
+                        label: const Text('4x #12 Branch'),
+                        onPressed: () => _applyPreset('preset_4x12_branch'),
+                      ),
+                      const SizedBox(width: 6),
+                      ActionChip(
+                        label: const Text('3x 4/0 Service'),
+                        onPressed: () => _applyPreset('preset_3x40_service'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
 
               // Raceway Selector Card
               _buildRacewaySelectorCard(raceway),
@@ -857,15 +1101,24 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
 
               const SizedBox(height: 14),
 
-              // Voltage Drop Expansion Card
-              _buildVoltageDropCard(vDrop),
+              // Progressive Disclosure Add-On Modules Bar
+              // Allows users to add Voltage Drop, Thermal Derating, or Quick Presets on demand
+              if (!_showVoltageDrop || !_showThermalDerating || !_showPresets) ...[
+                _buildProgressiveModulesSelector(),
+                const SizedBox(height: 14),
+              ],
 
-              const SizedBox(height: 14),
+              // Voltage Drop Expansion Card
+              if (_showVoltageDrop) ...[
+                _buildVoltageDropCard(vDrop),
+                const SizedBox(height: 14),
+              ],
 
               // Ampacity Derating Expansion Card
-              _buildDeratingCard(derate),
-
-              const SizedBox(height: 14),
+              if (_showThermalDerating) ...[
+                _buildDeratingCard(derate),
+                const SizedBox(height: 14),
+              ],
 
               // Export PDF / Sign Report Card
               _buildExportPdfCard(),
@@ -879,6 +1132,110 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  /// Progressive Disclosure Selector: lets users add calculation modules as they need them
+  Widget _buildProgressiveModulesSelector() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.darkCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.darkBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.add_chart_rounded, color: AppTheme.accent, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  _tr(
+                    'AGREGAR ANÁLISIS O HERRAMIENTAS AL CÁLCULO',
+                    'ADD ANALYSIS OR TOOLS TO CALCULATION',
+                    'ADICIONAR ANÁLISE OU FERRAMENTAS AO CÁLCULO',
+                  ),
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.accent,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _tr(
+              'Activa únicamente los módulos que necesites para este tramo:',
+              'Enable only the modules you need for this conduit run:',
+              'Ative apenas os módulos necessários para este trecho:',
+            ),
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (!_showVoltageDrop)
+                ActionChip(
+                  key: const Key('btnToggleVoltageDrop'),
+                  avatar: const Icon(Icons.bolt_rounded, size: 16, color: AppColors.caution),
+                  label: Text(
+                    _tr('+ Caída de Tensión', '+ Voltage Drop', '+ Queda de Tensão'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  backgroundColor: AppColors.surfaceElevated,
+                  side: BorderSide(color: AppColors.caution.withValues(alpha: 0.5)),
+                  onPressed: () => setState(() => _showVoltageDrop = true),
+                ),
+              if (!_showThermalDerating)
+                ActionChip(
+                  key: const Key('btnToggleThermalDerating'),
+                  avatar:
+                      const Icon(Icons.thermostat_rounded, size: 16, color: AppColors.compliant),
+                  label: Text(
+                    _tr('+ Desclasificación Térmica', '+ Thermal Derating', '+ Fator Térmico'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  backgroundColor: AppColors.surfaceElevated,
+                  side: BorderSide(color: AppColors.compliant.withValues(alpha: 0.5)),
+                  onPressed: () => setState(() => _showThermalDerating = true),
+                ),
+              if (!_showPresets)
+                ActionChip(
+                  key: const Key('btnToggleQuickPresets'),
+                  avatar: const Icon(Icons.auto_awesome_rounded, size: 16, color: AppTheme.accent),
+                  label: Text(
+                    _tr('+ Plantillas Rápidas NEC', '+ Quick Presets', '+ Modelos Rápidos'),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                  backgroundColor: AppColors.surfaceElevated,
+                  side: BorderSide(color: AppTheme.accent.withValues(alpha: 0.5)),
+                  onPressed: () => setState(() => _showPresets = true),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -1034,7 +1391,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 // Nipple <= 24" toggle
                 Row(
                   children: [
-                    const Text('Nipple ≤ 24"', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    const Text('Nipple ≤ 24"',
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                     Switch(
                       value: _isNipple,
                       activeThumbColor: AppColors.compliant,
@@ -1128,15 +1486,35 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               ],
             ),
             const Divider(color: AppColors.borderSubtle),
-
             if (_conductorGroups.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Center(
-                  child: Text(
-                    'No conductors added. Tap "Add Conductor" or select a preset.',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                  ),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Column(
+                  children: [
+                    const Center(
+                      child: Text(
+                        'No conductors added. Tap "Add Conductor" or select a preset.',
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    if (!_showPresets) ...[
+                      const SizedBox(height: 10),
+                      TextButton.icon(
+                        onPressed: () => setState(() => _showPresets = true),
+                        icon: const Icon(Icons.auto_awesome_rounded,
+                            size: 16, color: AppTheme.accent),
+                        label: Text(
+                          _tr(
+                            'Ver Plantillas Rápidas NEC',
+                            'Show Quick NEC Presets',
+                            'Ver Modelos Rápidos NEC',
+                          ),
+                          style: const TextStyle(color: AppTheme.accent, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               )
             else
@@ -1144,7 +1522,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 itemCount: _conductorGroups.length,
-                separatorBuilder: (context, i) => const Divider(color: AppColors.borderSubtle, height: 1),
+                separatorBuilder: (context, i) =>
+                    const Divider(color: AppColors.borderSubtle, height: 1),
                 itemBuilder: (context, index) {
                   final group = _conductorGroups[index];
                   final color = AppColors.getConductorColor(group.role);
@@ -1183,7 +1562,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                         // Stepper buttons
                         IconButton(
                           key: Key('btnStepperRemove_$index'),
-                          icon: const Icon(Icons.remove, size: 16, color: AppColors.textSecondary),
+                          icon:
+                              const Icon(Icons.remove, size: 16, color: AppColors.textSecondary),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                           onPressed: () => _updateGroupCount(index, -1),
@@ -1205,7 +1585,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                         ),
                         IconButton(
                           key: Key('btnDeleteGroup_$index'),
-                          icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.overfilled),
+                          icon: const Icon(Icons.delete_outline,
+                              size: 16, color: AppColors.overfilled),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
                           onPressed: () => _removeGroup(index),
@@ -1237,7 +1618,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               child: Text(
                 'Live Voltage Drop',
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
               ),
             ),
             const SizedBox(width: 8),
@@ -1256,6 +1638,16 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 ),
               ),
             ),
+            if (widget.startEmpty) ...[
+              const SizedBox(width: 4),
+              InkWell(
+                onTap: () => setState(() => _showVoltageDrop = false),
+                child: const Padding(
+                  padding: EdgeInsets.all(4.0),
+                  child: Icon(Icons.close_rounded, size: 16, color: AppColors.textSecondary),
+                ),
+              ),
+            ],
           ],
         ),
         childrenPadding: const EdgeInsets.all(12),
@@ -1406,7 +1798,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
               child: Text(
                 'Live Thermal Derating',
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                style: TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
               ),
             ),
             const SizedBox(width: 8),
@@ -1421,10 +1814,21 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                 child: Text(
                   '${derate.allowableAmpacity.toStringAsFixed(1)} A Allowable',
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.compliant, fontSize: 10, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      color: AppColors.compliant, fontSize: 10, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
+            if (widget.startEmpty) ...[
+              const SizedBox(width: 4),
+              InkWell(
+                onTap: () => setState(() => _showThermalDerating = false),
+                child: const Padding(
+                  padding: EdgeInsets.all(4.0),
+                  child: Icon(Icons.close_rounded, size: 16, color: AppColors.textSecondary),
+                ),
+              ),
+            ],
           ],
         ),
         childrenPadding: const EdgeInsets.all(12),
@@ -1447,7 +1851,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     'Temp Factor: ${derate.temperatureCorrectionFactor.toStringAsFixed(2)}',
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   ),
                 ),
               ),
@@ -1480,7 +1885,8 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
                     'Bundling Factor: ${derate.bundlingAdjustmentFactor.toStringAsFixed(2)}',
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                   ),
                 ),
               ),
@@ -1522,15 +1928,18 @@ class _CalculatorScreenState extends State<CalculatorScreen> {
             ),
             child: Column(
               children: [
-                _buildAmpacityRow('Base Ampacity (${_primaryConductorSpec.insulation.name.toUpperCase()} 90°C):',
+                _buildAmpacityRow(
+                    'Base Ampacity (${_primaryConductorSpec.insulation.name.toUpperCase()} 90°C):',
                     '${derate.baseAmpacity.toStringAsFixed(1)} A'),
                 _buildAmpacityRow('Derated Ampacity (Base × CF × AF):',
                     '${derate.deratedAmpacity.toStringAsFixed(1)} A'),
-                _buildAmpacityRow('Terminal Limit (${_terminalRatingC.toStringAsFixed(0)}°C NEC 110.14(C)):',
+                _buildAmpacityRow(
+                    'Terminal Limit (${_terminalRatingC.toStringAsFixed(0)}°C NEC 110.14(C)):',
                     '${derate.terminalRatingLimit.toStringAsFixed(1)} A'),
                 const Divider(color: AppColors.borderSubtle, height: 8),
                 _buildAmpacityRow('Final Allowable Ampacity:',
-                    '${derate.allowableAmpacity.toStringAsFixed(1)} A', isBold: true),
+                    '${derate.allowableAmpacity.toStringAsFixed(1)} A',
+                    isBold: true),
                 if (derate.smallWireOcpdLimit != null)
                   _buildAmpacityRow('Small Conductor OCPD Limit (NEC 240.4(D)):',
                       '${derate.smallWireOcpdLimit} A Max'),
