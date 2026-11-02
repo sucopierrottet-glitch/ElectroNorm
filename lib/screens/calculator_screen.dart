@@ -13,6 +13,7 @@ import '../services/pdf_report_service.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/onboarding_dialog.dart';
+import '../widgets/pro_upsell_dialog.dart';
 import '../widgets/raceway_painter.dart';
 import 'paywall_screen.dart';
 import 'report_preview_screen.dart';
@@ -468,6 +469,15 @@ class CalculatorScreenState extends State<CalculatorScreen> {
   }
 
   Future<void> _showSaveCalculationDialog() async {
+    final canSave = await StorageService.instance.canCreateProject();
+    if (!canSave) {
+      if (mounted) {
+        await ProUpsellDialog.show(context);
+      }
+      return;
+    }
+    if (!mounted) return;
+
     final totalConds = _conductorGroups.fold(0, (sum, g) => sum + g.count);
     final defaultTitle =
         'Run #${totalConds}W - ${_currentRacewayProfile.tradeSize}" ${_currentRacewayProfile.type.displayName}';

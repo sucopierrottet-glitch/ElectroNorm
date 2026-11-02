@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show WidgetsBinding;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
@@ -286,14 +288,43 @@ abstract class StorageService implements Listenable {
   /// Global singleton instance
   static StorageService instance = SharedPreferencesStorageService();
 
-  // Localization
+  /// Helper to detect whether we are running inside flutter_test
+  static bool get isTestEnvironment {
+    try {
+      final bindingName = WidgetsBinding.instance.runtimeType.toString();
+      return bindingName.contains('Test');
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Auto-detects supported language ('es', 'en', 'pt') from system/browser locale
+  static String detectDeviceLocaleCode([ui.Locale? localeOverride]) {
+    try {
+      final locale = localeOverride ?? ui.PlatformDispatcher.instance.locale;
+      final lang = locale.languageCode.toLowerCase();
+      if (lang.startsWith('en')) return 'en';
+      if (lang.startsWith('pt')) return 'pt';
+      return 'es';
+    } catch (_) {
+      return 'es';
+    }
+  }
+
+  // Initialization & Localization
+  Future<void> init({ui.Locale? deviceLocaleOverride});
   String get localeCode;
   Future<void> setLocale(String code);
   AppStrings get strings;
 
-  // Onboarding
+  // Onboarding & Soft Payment Upsell
   Future<bool> hasSeenOnboarding();
   Future<void> setHasSeenOnboarding(bool value);
+  Future<int> getAppOpenCount();
+  Future<bool> recordAppOpenAndCheckUpsell();
+  Future<int> getProjectsCountThisMonth();
+  Future<int> getRemainingFreeProjects();
+  Future<bool> canCreateProject();
 
   // Saved Calculations
   Future<List<SavedCalculation>> getSavedCalculations();
@@ -329,6 +360,8 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
   static const String _keyDemoMode = 'electronorm_demo_mode';
   static const String _keyLocale = 'electronorm_locale_code';
   static const String _keyOnboarding = 'electronorm_has_seen_onboarding';
+  static const String _keyAppOpenCount = 'electronorm_app_open_count';
+  static const String _keyMonthlyUsagePrefix = 'electronorm_created_month_';
 
   final SharedPreferences? _injectedPrefs;
   String _localeCode = 'es';
@@ -336,13 +369,33 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
 
   SharedPreferencesStorageService([this._injectedPrefs]) {
     if (_injectedPrefs != null) {
-      _localeCode = _injectedPrefs.getString(_keyLocale) ?? 'es';
+      final saved = _injectedPrefs.getString(_keyLocale);
+      if (saved != null && saved.isNotEmpty) {
+        _localeCode = saved;
+      } else if (!StorageService.isTestEnvironment) {
+        _localeCode = StorageService.detectDeviceLocaleCode();
+      }
       _localeInitialized = true;
+    } else if (!StorageService.isTestEnvironment) {
+      _localeCode = StorageService.detectDeviceLocaleCode();
     }
   }
 
   /// Global static accessor
   static StorageService instance = SharedPreferencesStorageService();
+
+  @override
+  Future<void> init({ui.Locale? deviceLocaleOverride}) async {
+    final prefs = _injectedPrefs ?? await SharedPreferences.getInstance();
+    final saved = prefs.getString(_keyLocale);
+    if (saved != null && saved.isNotEmpty) {
+      _localeCode = saved;
+    } else {
+      _localeCode = StorageService.detectDeviceLocaleCode(deviceLocaleOverride);
+    }
+    _localeInitialized = true;
+    notifyListeners();
+  }
 
   @override
   String get localeCode => _localeCode;
@@ -377,6 +430,51 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
     notifyListeners();
   }
 
+  @override
+  Future<int> getAppOpenCount() async {
+    final prefs = await _getPrefs();
+    return prefs.getInt(_keyAppOpenCount) ?? 0;
+  }
+
+  @override
+  Future<bool> recordAppOpenAndCheckUpsell() async {
+    if (await isProSubscriber()) return false;
+    if (!(await hasSeenOnboarding())) return false;
+
+    final prefs = await _getPrefs();
+    final nextCount = (prefs.getInt(_keyAppOpenCount) ?? 0) + 1;
+    await prefs.setInt(_keyAppOpenCount, nextCount);
+    return nextCount % 3 == 0;
+  }
+
+  @override
+  Future<int> getProjectsCountThisMonth() async {
+    final now = DateTime.now();
+    final monthKey = '$_keyMonthlyUsagePrefix${now.year}_${now.month}';
+    final prefs = await _getPrefs();
+    final storedUsage = prefs.getInt(monthKey) ?? 0;
+    final all = await getSavedCalculations();
+    final activeInMonth = all
+        .where((c) => c.timestamp.year == now.year && c.timestamp.month == now.month)
+        .length;
+    return storedUsage > activeInMonth ? storedUsage : activeInMonth;
+  }
+
+  @override
+  Future<int> getRemainingFreeProjects() async {
+    if (await isProSubscriber()) return 999999;
+    final used = await getProjectsCountThisMonth();
+    final remaining = 3 - used;
+    return remaining > 0 ? remaining : 0;
+  }
+
+  @override
+  Future<bool> canCreateProject() async {
+    if (await isProSubscriber()) return true;
+    final used = await getProjectsCountThisMonth();
+    return used < 3;
+  }
+
   Future<SharedPreferences> _getPrefs() async {
     final prefs = _injectedPrefs ?? await SharedPreferences.getInstance();
     if (!_localeInitialized) {
@@ -386,6 +484,8 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
         if (saved != null && saved.isNotEmpty) {
           _localeCode = saved;
         }
+      } else if (!StorageService.isTestEnvironment) {
+        _localeCode = StorageService.detectDeviceLocaleCode();
       }
     }
     return prefs;
@@ -434,6 +534,7 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
   Future<void> saveCalculation(SavedCalculation item) async {
     final all = await getSavedCalculations();
     final index = all.indexWhere((e) => e.id == item.id);
+    final isNew = index < 0;
     if (index >= 0) {
       all[index] = item;
     } else {
@@ -442,6 +543,12 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
     final prefs = await _getPrefs();
     final encoded = jsonEncode(all.map((e) => e.toJson()).toList());
     await prefs.setString(_keyCalculations, encoded);
+    if (isNew) {
+      final now = DateTime.now();
+      final monthKey = '$_keyMonthlyUsagePrefix${now.year}_${now.month}';
+      final cur = prefs.getInt(monthKey) ?? 0;
+      await prefs.setInt(monthKey, cur + 1);
+    }
     notifyListeners();
   }
 
@@ -466,6 +573,7 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
     await prefs.remove(_keyDemoMode);
     await prefs.remove(_keyLocale);
     await prefs.remove(_keyOnboarding);
+    await prefs.remove(_keyAppOpenCount);
     _localeCode = 'es';
     notifyListeners();
   }

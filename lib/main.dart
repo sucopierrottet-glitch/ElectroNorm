@@ -5,7 +5,9 @@ import 'screens/welcome_landing_screen.dart';
 import 'services/storage_service.dart';
 import 'theme/app_theme.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await StorageService.instance.init();
   runApp(const ElectroNormApp());
 }
 

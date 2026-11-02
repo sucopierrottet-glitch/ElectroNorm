@@ -7,6 +7,21 @@ class OnboardingDialog extends StatefulWidget {
 
   const OnboardingDialog({super.key, required this.storageService});
 
+  static Future<void> show(
+    BuildContext context, {
+    StorageService? storageService,
+  }) async {
+    final storage = storageService ?? StorageService.instance;
+    final seen = await storage.hasSeenOnboarding();
+    if (seen) return;
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => OnboardingDialog(storageService: storage),
+    );
+  }
+
   @override
   State<OnboardingDialog> createState() => _OnboardingDialogState();
 }

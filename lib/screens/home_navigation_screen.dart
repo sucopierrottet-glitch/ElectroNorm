@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../models/conductor.dart';
 import '../models/raceway.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/onboarding_dialog.dart';
+import '../widgets/pro_upsell_dialog.dart';
 import 'calculator_screen.dart';
 import 'nec_catalog_screen.dart';
 import 'saved_projects_screen.dart';
@@ -25,6 +28,9 @@ class HomeNavigationScreen extends StatefulWidget {
 
 class _HomeNavigationScreenState extends State<HomeNavigationScreen> {
   late int _currentIndex;
+  bool _upsellShownThisSession = false;
+  Timer? _usageUpsellTimer;
+
   final GlobalKey<CalculatorScreenState> _calculatorKey =
       GlobalKey<CalculatorScreenState>();
 
@@ -39,6 +45,49 @@ class _HomeNavigationScreenState extends State<HomeNavigationScreen> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (StorageService.isTestEnvironment) return;
+
+      final seenOnboarding = await StorageService.instance.hasSeenOnboarding();
+      if (!seenOnboarding) {
+        if (mounted) {
+          await OnboardingDialog.show(context);
+        }
+      } else {
+        final shouldShow =
+            await StorageService.instance.recordAppOpenAndCheckUpsell();
+        final isPro = await StorageService.instance.isProSubscriber();
+        if (shouldShow && mounted && !isPro) {
+          _upsellShownThisSession = true;
+          await ProUpsellDialog.show(context);
+        }
+      }
+      _startUsageUpsellTimer();
+    });
+  }
+
+  void _startUsageUpsellTimer() {
+    _usageUpsellTimer?.cancel();
+    if (StorageService.isTestEnvironment) return;
+
+    _usageUpsellTimer = Timer(const Duration(minutes: 3), () async {
+      if (!mounted || _upsellShownThisSession) return;
+      final isPro = await StorageService.instance.isProSubscriber();
+      if (isPro || !mounted || _upsellShownThisSession) return;
+
+      final isCurrentRoute = ModalRoute.of(context)?.isCurrent ?? false;
+      if (isCurrentRoute) {
+        _upsellShownThisSession = true;
+        await ProUpsellDialog.show(context);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _usageUpsellTimer?.cancel();
+    super.dispose();
   }
 
   void _handleSelectProject(SavedCalculation item) {

@@ -57,15 +57,14 @@ jobs:
       - name: Publish GitHub Release with APK & AAB
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.0
-          name: "ElectroNorm Pro v1.2.0+3 (FieldQuote-Aligned UI & Progressive Disclosure)"
+          tag_name: v1.2.1
+          name: "ElectroNorm Pro v1.2.1+4 (Soft Paywall Upsell & Auto Device Language)"
           body: |
-            ### ElectroNorm Pro v1.2.0+3 (Production Release)
+            ### ElectroNorm Pro v1.2.1+4 (Production Release)
+            - Periodic Pro Upsell popup (`ProUpsellDialog`) every 3rd app open & during active sessions
+            - Automatic device/browser language detection (ES / EN / PT)
             - Unified FieldQuote-style 4-tab navigation (Calculadora, Proyectos, Catálogo NEC, Ajustes)
             - Progressive Disclosure in Calculator (+ Caída de Tensión, + Desclasificación Térmica, + Plantillas Rápidas NEC)
-            - Interactive NEC Chapter 9 Conductor & Raceway Catalog with 1-tap apply
-            - Unified Settings & Business Profile with Default Digital Signature capture
-            - Multi-language support (ES / EN / PT)
             - Attached signed `electronorm.apk` and `app-release.aab`
           files: |
             electronorm.apk

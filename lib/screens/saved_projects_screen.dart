@@ -5,6 +5,7 @@ import '../models/raceway.dart';
 import '../services/pdf_report_service.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/pro_upsell_dialog.dart';
 import '../widgets/stat_card.dart';
 import 'report_preview_screen.dart';
 
@@ -40,6 +41,8 @@ class SavedProjectsScreen extends StatefulWidget {
 class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
   List<SavedCalculation> _allCalculations = [];
   bool _isLoading = true;
+  bool _isPro = false;
+  int _remainingFree = 3;
   String _searchQuery = '';
   SortOption _selectedSort = SortOption.newest;
   FilterOption _selectedFilter = FilterOption.all;
@@ -65,9 +68,13 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
 
   Future<void> _loadCalculations() async {
     final list = await StorageService.instance.getSavedCalculations();
+    final isPro = await StorageService.instance.isProSubscriber();
+    final remaining = await StorageService.instance.getRemainingFreeProjects();
     if (mounted) {
       setState(() {
         _allCalculations = list;
+        _isPro = isPro;
+        _remainingFree = remaining;
         _isLoading = false;
       });
     }
@@ -237,6 +244,33 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
       appBar: AppBar(
         title: const Text('Saved Projects'),
         actions: [
+          if (!_isPro)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: InkWell(
+                key: const Key('btnFreeQuotaPill'),
+                onTap: () => ProUpsellDialog.show(context),
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$_remainingFree/3 Free',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        color: Colors.amber,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           PopupMenuButton<SortOption>(
             key: const Key('btnSortProjects'),
             icon: const Icon(Icons.sort_rounded),
