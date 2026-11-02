@@ -1,0 +1,74 @@
+name: Build and Release ElectroNorm Pro
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    name: Build Android APK & App Bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'microsoft'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Release APK
+        run: flutter build apk --release
+
+      - name: Prepare APK File
+        run: cp build/app/outputs/flutter-apk/app-release.apk electronorm.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: electronorm-apk
+          path: electronorm.apk
+
+      - name: Build App Bundle
+        run: flutter build appbundle --release
+
+      - name: Upload AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+
+      - name: Publish GitHub Release with APK & AAB
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.2.0
+          name: "ElectroNorm Pro v1.2.0+3 (FieldQuote-Aligned UI & Progressive Disclosure)"
+          body: |
+            ### ElectroNorm Pro v1.2.0+3 (Production Release)
+            - Unified FieldQuote-style 4-tab navigation (Calculadora, Proyectos, Catálogo NEC, Ajustes)
+            - Progressive Disclosure in Calculator (+ Caída de Tensión, + Desclasificación Térmica, + Plantillas Rápidas NEC)
+            - Interactive NEC Chapter 9 Conductor & Raceway Catalog with 1-tap apply
+            - Unified Settings & Business Profile with Default Digital Signature capture
+            - Multi-language support (ES / EN / PT)
+            - Attached signed `electronorm.apk` and `app-release.aab`
+          files: |
+            electronorm.apk
+            build/app/outputs/bundle/release/app-release.aab
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
