@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/conductor.dart';
 import '../models/raceway.dart';
@@ -111,6 +112,67 @@ class _HomeNavigationScreenState extends State<HomeNavigationScreen> {
     });
   }
 
+  Future<bool> _showExitConfirmationDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppTheme.darkCard,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: AppTheme.darkBorder),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.exit_to_app_rounded, color: AppTheme.primary, size: 22),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                _tr('¿Salir de ElectroNorm?', 'Exit ElectroNorm?', 'Sair do ElectroNorm?'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          _tr(
+            '¿Estás seguro de que deseas cerrar la aplicación?',
+            'Are you sure you want to close the application?',
+            'Tem certeza de que deseja fechar o aplicativo?',
+          ),
+          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              _tr('Cancelar', 'Cancel', 'Cancelar'),
+              style: const TextStyle(color: AppTheme.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primary,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              _tr('Salir', 'Exit', 'Sair'),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
@@ -136,12 +198,25 @@ class _HomeNavigationScreenState extends State<HomeNavigationScreen> {
           const SettingsScreen(),
         ];
 
-        return Scaffold(
-          body: IndexedStack(
-            index: _currentIndex,
-            children: screens,
-          ),
-          bottomNavigationBar: Container(
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) async {
+            if (didPop) return;
+            if (_currentIndex != 0) {
+              setState(() => _currentIndex = 0);
+              return;
+            }
+            final shouldExit = await _showExitConfirmationDialog();
+            if (shouldExit && context.mounted) {
+              SystemNavigator.pop();
+            }
+          },
+          child: Scaffold(
+            body: IndexedStack(
+              index: _currentIndex,
+              children: screens,
+            ),
+            bottomNavigationBar: Container(
             decoration: const BoxDecoration(
               color: AppTheme.darkSurface,
               border: Border(
@@ -183,10 +258,11 @@ class _HomeNavigationScreenState extends State<HomeNavigationScreen> {
               ),
             ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 
   Widget _buildNavItem({
     required int index,

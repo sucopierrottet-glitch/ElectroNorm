@@ -195,7 +195,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _openPrivacyPolicy() async {
-    final uri = Uri.parse('https://simpleappspg.com/privacy-electronorm');
+    final uri = Uri.parse('https://sucopierrottet-glitch.github.io/electronorm-privacy/');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri, mode: LaunchMode.externalApplication);
     }
