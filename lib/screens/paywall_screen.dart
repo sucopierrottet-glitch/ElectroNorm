@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../services/billing_service.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 
@@ -19,6 +20,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
   bool _isPro = false;
   bool _isLoading = true;
   bool _hasPromptedRescue = false;
+  bool _hasHandledSuccess = false;
+
+  late final BillingService _billingService;
 
   // 5-tap secret demo toggle tracking
   int _secretTapCount = 0;
@@ -27,7 +31,61 @@ class _PaywallScreenState extends State<PaywallScreen> {
   @override
   void initState() {
     super.initState();
+    _billingService = BillingService(storageService: StorageService.instance);
+    _billingService.addListener(_onBillingChanged);
+    _billingService.init();
     _loadSubscriberStatus();
+  }
+
+  @override
+  void dispose() {
+    _billingService.removeListener(_onBillingChanged);
+    _billingService.dispose();
+    super.dispose();
+  }
+
+  String _tr(String es, String en, String pt) {
+    final lang = StorageService.instance.localeCode.toLowerCase();
+    if (lang.startsWith('en')) return en;
+    if (lang.startsWith('pt')) return pt;
+    return es;
+  }
+
+  void _onBillingChanged() {
+    if (!mounted) return;
+
+    if (_billingService.purchaseSucceeded && !_hasHandledSuccess) {
+      _hasHandledSuccess = true;
+      _isPro = true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.compliant,
+          content: Text(
+            _tr(
+              '¡Bienvenido a ElectroNorm PRO! Plan activado con éxito.',
+              'Welcome to ElectroNorm Pro! Plan activated successfully.',
+              'Bem-vindo ao ElectroNorm PRO! Plano ativado com sucesso.',
+            ),
+            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      Navigator.of(context).pop(true);
+      return;
+    }
+
+    if (_billingService.lastError != null && !_billingService.isPurchasePending) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_billingService.lastError!),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+
+    setState(() {});
   }
 
   Future<void> _loadSubscriberStatus() async {
@@ -77,44 +135,51 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   Future<void> _subscribe() async {
-    setState(() => _isLoading = true);
-    if (_selectedTier == PaywallTier.annual) {
-      await StorageService.instance.startTrial();
-      await StorageService.instance.setSubscriptionTier('annual');
-    } else {
-      await StorageService.instance.setProSubscriber(true);
-      await StorageService.instance.setSubscriptionTier('monthly');
-    }
-    if (mounted) {
-      setState(() {
-        _isPro = true;
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: AppColors.compliant,
-          content: Text(
-            _selectedTier == PaywallTier.annual
-                ? '14-Day Free Trial Activated! Welcome to ElectroNorm Pro.'
-                : 'Subscribed to ElectroNorm Pro Monthly!',
-            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-          ),
-          behavior: SnackBarBehavior.floating,
-        ),
+    final errorCode = await _billingService.buySubscription(
+      isYearly: _selectedTier == PaywallTier.annual,
+    );
+
+    if (!mounted || errorCode == null) return;
+
+    String message;
+    if (errorCode == 'store_unavailable') {
+      message = _tr(
+        'Google Play Store no está disponible en este dispositivo.',
+        'Google Play Store is not available on this device.',
+        'A Google Play Store não está disponível neste dispositivo.',
       );
-      Navigator.of(context).pop(true);
+    } else if (errorCode == 'product_not_found') {
+      message = _tr(
+        'La suscripción aún se está sincronizando con Google Play. Intenta nuevamente en unos minutos.',
+        'Subscription is still syncing with Google Play. Please try again in a few minutes.',
+        'A assinatura ainda está sincronizando com o Google Play. Tente novamente em alguns minutos.',
+      );
+    } else {
+      message = _tr(
+        'No se pudo iniciar el proceso de compra en Google Play.',
+        'Could not start the purchase flow on Google Play.',
+        'Não foi possível iniciar o processo de compra no Google Play.',
+      );
     }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.orange.shade800,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _restorePurchases() async {
-    setState(() => _isLoading = true);
-    final pro = await StorageService.instance.isProSubscriber();
-    if (mounted) {
-      setState(() {
-        _isPro = pro;
-        _isLoading = false;
-      });
+    final errorCode = await _billingService.restorePurchases();
+    if (!mounted) return;
+
+    if (errorCode != null) {
+      final pro = await StorageService.instance.isProSubscriber();
+      if (!mounted) return;
       if (pro) {
+        setState(() => _isPro = true);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             backgroundColor: AppColors.compliant,
@@ -128,17 +193,44 @@ class _PaywallScreenState extends State<PaywallScreen> {
         Navigator.of(context).pop(true);
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             backgroundColor: AppColors.surfaceElevated,
             content: Text(
-              'No active subscription found for this account.',
-              style: TextStyle(color: AppColors.textPrimary),
+              _tr(
+                'No se encontraron suscripciones activas asociadas a tu cuenta de Google Play.',
+                'No active subscription found for this account.',
+                'Nenhuma assinatura ativa encontrada para sua conta do Google Play.',
+              ),
+              style: const TextStyle(color: AppColors.textPrimary),
             ),
             behavior: SnackBarBehavior.floating,
           ),
         );
       }
+      return;
     }
+
+    Future.delayed(const Duration(seconds: 2), () async {
+      if (!mounted || _hasHandledSuccess) return;
+      final pro = await StorageService.instance.isProSubscriber();
+      if (!mounted) return;
+      if (!pro) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.surfaceElevated,
+            content: Text(
+              _tr(
+                'No se encontraron suscripciones activas asociadas a tu cuenta de Google Play.',
+                'No active subscription found for this account.',
+                'Nenhuma assinatura ativa encontrada para sua conta do Google Play.',
+              ),
+              style: const TextStyle(color: AppColors.textPrimary),
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    });
   }
 
   Future<bool> _handlePopAttempt() async {
@@ -202,11 +294,16 @@ class _PaywallScreenState extends State<PaywallScreen> {
     );
 
     if (claimTrial == true) {
-      await StorageService.instance.startTrial();
-      await StorageService.instance.setSubscriptionTier('annual');
-      if (mounted) {
-        Navigator.of(context).pop(true);
+      if (StorageService.isTestEnvironment) {
+        await StorageService.instance.startTrial();
+        await StorageService.instance.setSubscriptionTier('annual');
+        if (mounted) {
+          Navigator.of(context).pop(true);
+        }
+        return false;
       }
+      setState(() => _selectedTier = PaywallTier.annual);
+      await _subscribe();
       return false;
     }
     return true;
@@ -224,6 +321,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final monthlyProduct = _billingService.monthlyProduct;
+    final yearlyProduct = _billingService.yearlyProduct;
+    final isBusy = _billingService.isPurchasePending;
+
+    final annualPriceText = yearlyProduct != null ? '${yearlyProduct.price}/yr' : '\$69.00/yr';
+    final monthlyPriceText = monthlyProduct != null ? '${monthlyProduct.price}/mo' : '\$8.99/mo';
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
@@ -250,7 +354,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
           actions: [
             TextButton(
               key: const Key('btnRestorePaywall'),
-              onPressed: _restorePurchases,
+              onPressed: isBusy ? null : _restorePurchases,
               child: const Text(
                 'Restore',
                 style: TextStyle(
@@ -362,7 +466,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                         key: const Key('cardTierAnnual'),
                         tier: PaywallTier.annual,
                         title: 'Annual Pass',
-                        price: '\$69.00/yr',
+                        price: annualPriceText,
                         periodDetail: '\$5.75/month • Billed annually',
                         badgeText: '14-DAY FREE TRIAL',
                         savingsText: 'BEST VALUE • SAVE 36%',
@@ -376,7 +480,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                         key: const Key('cardTierMonthly'),
                         tier: PaywallTier.monthly,
                         title: 'Monthly Subscription',
-                        price: '\$8.99/mo',
+                        price: monthlyPriceText,
                         periodDetail: 'Flexible monthly billing • Cancel anytime',
                         badgeText: null,
                         savingsText: null,
@@ -399,17 +503,26 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             ),
                             elevation: 4,
                           ),
-                          onPressed: _subscribe,
-                          child: Text(
-                            _selectedTier == PaywallTier.annual
-                                ? 'Start 14-Day Free Trial'
-                                : 'Subscribe Now — \$8.99/mo',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
+                          onPressed: isBusy ? null : _subscribe,
+                          child: isBusy
+                              ? const SizedBox(
+                                  height: 22,
+                                  width: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.5,
+                                    color: Colors.black,
+                                  ),
+                                )
+                              : Text(
+                                  _selectedTier == PaywallTier.annual
+                                      ? 'Start 14-Day Free Trial'
+                                      : 'Subscribe Now — $monthlyPriceText',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.3,
+                                  ),
+                                ),
                         ),
                       ),
 
@@ -417,7 +530,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
                       Text(
                         _selectedTier == PaywallTier.annual
-                            ? '14 days free, then \$69.00/year. Cancel anytime in Google Play.'
+                            ? '14 days free, then $annualPriceText. Cancel anytime in Google Play.'
                             : 'Recurring billing. Cancel anytime in Google Play.',
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
