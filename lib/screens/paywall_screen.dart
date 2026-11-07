@@ -327,6 +327,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
     final annualPriceText = yearlyProduct != null ? '${yearlyProduct.price}/yr' : '\$69.00/yr';
     final monthlyPriceText = monthlyProduct != null ? '${monthlyProduct.price}/mo' : '\$8.99/mo';
+    final annualPeriodDetail = yearlyProduct != null
+        ? _tr('Facturado anualmente • Cancela cuando quieras', 'Billed annually • Cancel anytime', 'Cobrado anualmente • Cancele quando quiser')
+        : '\$5.75/month • Billed annually';
 
     return PopScope(
       canPop: false,
@@ -467,7 +470,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                         tier: PaywallTier.annual,
                         title: 'Annual Pass',
                         price: annualPriceText,
-                        periodDetail: '\$5.75/month • Billed annually',
+                        periodDetail: annualPeriodDetail,
                         badgeText: '14-DAY FREE TRIAL',
                         savingsText: 'BEST VALUE • SAVE 36%',
                         isRecommended: true,
