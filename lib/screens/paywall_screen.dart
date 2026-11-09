@@ -325,11 +325,15 @@ class _PaywallScreenState extends State<PaywallScreen> {
     final yearlyProduct = _billingService.yearlyProduct;
     final isBusy = _billingService.isPurchasePending;
 
-    final annualPriceText = yearlyProduct != null ? '${yearlyProduct.price}/yr' : '\$69.00/yr';
-    final monthlyPriceText = monthlyProduct != null ? '${monthlyProduct.price}/mo' : '\$8.99/mo';
+    final annualPriceText = yearlyProduct != null
+        ? '${yearlyProduct.price}/yr'
+        : (StorageService.isTestEnvironment ? '\$69.00/yr' : _tr('Consultar precio', 'Check price', 'Consultar preço'));
+    final monthlyPriceText = monthlyProduct != null
+        ? '${monthlyProduct.price}/mo'
+        : (StorageService.isTestEnvironment ? '\$8.99/mo' : _tr('Consultar precio', 'Check price', 'Consultar preço'));
     final annualPeriodDetail = yearlyProduct != null
         ? _tr('Facturado anualmente • Cancela cuando quieras', 'Billed annually • Cancel anytime', 'Cobrado anualmente • Cancele quando quiser')
-        : '\$5.75/month • Billed annually';
+        : (StorageService.isTestEnvironment ? '\$5.75/month • Billed annually' : _tr('Facturado anualmente', 'Billed annually', 'Cobrado anualmente'));
 
     return PopScope(
       canPop: false,
@@ -690,12 +694,17 @@ class _PaywallScreenState extends State<PaywallScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  price,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      price,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
                   ),
                 ),
               ],
