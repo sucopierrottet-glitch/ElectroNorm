@@ -796,7 +796,7 @@ void main() {
       // Pricing disclosures
       expect(html, contains(r'$8.99'));
       expect(html, contains(r'$69.00'));
-      expect(html, contains('14-Day Free Trial'));
+      expect(html, contains('7-Day Free Trial'));
     });
   });
 }

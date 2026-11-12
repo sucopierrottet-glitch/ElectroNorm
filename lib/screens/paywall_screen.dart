@@ -254,7 +254,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
             SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Wait! Unlock 14 Days Free',
+                'Wait! Unlock 7 Days Free',
                 style: TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 18,
@@ -265,7 +265,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
           ],
         ),
         content: const Text(
-          'Don\'t leave empty-handed. Try ElectroNorm Pro free for 14 days with zero commitment. Generate inspection-ready signed technical compliance reports on your job site.',
+          'Don\'t leave empty-handed. Try ElectroNorm Pro free for 7 days with zero commitment. Generate inspection-ready signed technical compliance reports on your job site.',
           style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
         ),
         actions: [
@@ -285,7 +285,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
             child: const Text(
-              'Claim 14-Day Free Trial',
+              'Claim 7-Day Free Trial',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
@@ -468,14 +468,14 @@ class _PaywallScreenState extends State<PaywallScreen> {
                       const SizedBox(height: 24),
 
                       // Pricing Tiers
-                      // Tier 2: Annual Plan ($69.00/yr with 14-Day Free Trial)
+                      // Tier 2: Annual Plan ($69.00/yr with 7-Day Free Trial)
                       _buildTierCard(
                         key: const Key('cardTierAnnual'),
                         tier: PaywallTier.annual,
                         title: 'Annual Pass',
                         price: annualPriceText,
                         periodDetail: annualPeriodDetail,
-                        badgeText: '14-DAY FREE TRIAL',
+                        badgeText: '7-DAY FREE TRIAL',
                         savingsText: 'BEST VALUE • SAVE 36%',
                         isRecommended: true,
                       ),
@@ -522,7 +522,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                 )
                               : Text(
                                   _selectedTier == PaywallTier.annual
-                                      ? 'Start 14-Day Free Trial'
+                                      ? 'Start 7-Day Free Trial'
                                       : 'Subscribe Now — $monthlyPriceText',
                                   style: const TextStyle(
                                     fontSize: 16,
@@ -537,7 +537,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
                       Text(
                         _selectedTier == PaywallTier.annual
-                            ? '14 days free, then $annualPriceText. Cancel anytime in Google Play.'
+                            ? '7 days free, then $annualPriceText. Cancel anytime in Google Play.'
                             : 'Recurring billing. Cancel anytime in Google Play.',
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),

@@ -19,6 +19,8 @@ import 'paywall_screen.dart';
 import 'report_preview_screen.dart';
 import 'saved_projects_screen.dart';
 import 'settings_screen.dart';
+import 'conduit_bending_screen.dart';
+import 'grounding_screen.dart';
 
 class CalculatorScreen extends StatefulWidget {
   final bool startEmpty;
@@ -1243,6 +1245,46 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                   side: BorderSide(color: AppTheme.accent.withValues(alpha: 0.5)),
                   onPressed: () => setState(() => _showPresets = true),
                 ),
+              ActionChip(
+                key: const Key('btnOpenConduitBending'),
+                avatar: const Icon(Icons.architecture_rounded, size: 16, color: AppTheme.accent),
+                label: Text(
+                  _tr('Doblado EMT', 'Conduit Bending', 'Dobragem EMT'),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                backgroundColor: AppColors.surfaceElevated,
+                side: BorderSide(color: AppTheme.accent.withValues(alpha: 0.5)),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const ConduitBendingScreen()),
+                  );
+                },
+              ),
+              ActionChip(
+                key: const Key('btnOpenGroundingCalc'),
+                avatar: const Icon(Icons.shield_outlined, size: 16, color: AppColors.compliant),
+                label: Text(
+                  _tr('Tierra NEC 250', 'Grounding NEC 250', 'Aterramento 250'),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                backgroundColor: AppColors.surfaceElevated,
+                side: BorderSide(color: AppColors.compliant.withValues(alpha: 0.5)),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const GroundingScreen()),
+                  );
+                },
+              ),
             ],
           ),
         ],

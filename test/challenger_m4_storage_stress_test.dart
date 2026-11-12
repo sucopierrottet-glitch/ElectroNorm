@@ -452,7 +452,7 @@ void main() {
       });
       final service3 = SharedPreferencesStorageService();
       expect(await service3.isTrialActive(), isTrue);
-      expect(await service3.getRemainingTrialDays(), equals(14));
+      expect(await service3.getRemainingTrialDays(), equals(7));
       // Even if is_pro was false in prefs, active trial yields true for isProSubscriber
       expect(await service3.isProSubscriber(), isTrue);
     });

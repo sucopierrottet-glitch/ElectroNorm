@@ -233,8 +233,8 @@ void main() {
       await storageService.startTrial();
       expect(await storageService.isTrialActive(), isTrue);
       expect(await storageService.isProSubscriber(), isTrue);
-      expect(await storageService.getRemainingTrialDays(), inInclusiveRange(13, 14));
-      expect(await storageService.getSubscriptionTier(), equals('trial_14d'));
+      expect(await storageService.getRemainingTrialDays(), inInclusiveRange(6, 7));
+      expect(await storageService.getSubscriptionTier(), equals('trial_7d'));
 
       // Direct Pro subscriber toggle
       await storageService.setProSubscriber(false);
@@ -441,10 +441,10 @@ void main() {
 
       expect(find.text('\$69.00/yr'), findsOneWidget);
       expect(find.text('\$8.99/mo'), findsOneWidget);
-      expect(find.text('14-DAY FREE TRIAL'), findsOneWidget);
+      expect(find.text('7-DAY FREE TRIAL'), findsOneWidget);
       expect(find.text('BEST VALUE • SAVE 36%'), findsOneWidget);
       expect(find.byKey(const Key('btnSubscribePaywall')), findsOneWidget);
-      expect(find.text('Start 14-Day Free Trial'), findsOneWidget);
+      expect(find.text('Start 7-Day Free Trial'), findsOneWidget);
     });
 
     testWidgets('2. Tapping Monthly tier updates selected plan and CTA button text', (tester) async {
@@ -538,7 +538,7 @@ void main() {
 
       // Rescue dialog appears
       expect(find.byKey(const Key('dialogRescue')), findsOneWidget);
-      expect(find.text('Wait! Unlock 14 Days Free'), findsOneWidget);
+      expect(find.text('Wait! Unlock 7 Days Free'), findsOneWidget);
       expect(find.byKey(const Key('btnRescueClaimTrial')), findsOneWidget);
 
       // Claim trial
@@ -800,7 +800,7 @@ void main() {
       expect(content, contains('Offline-First Architecture'));
       expect(content, contains('\$8.99'));
       expect(content, contains('\$69.00'));
-      expect(content, contains('14-Day Free Trial'));
+      expect(content, contains('7-Day Free Trial'));
     });
   });
 }

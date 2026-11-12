@@ -670,7 +670,7 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
   Future<void> startTrial() async {
     final prefs = await _getPrefs();
     await prefs.setString(_keyTrialStart, DateTime.now().toIso8601String());
-    await prefs.setString(_keyTier, 'trial_14d');
+    await prefs.setString(_keyTier, 'trial_7d');
     await prefs.setBool(_keyIsPro, true);
     notifyListeners();
   }
@@ -680,7 +680,7 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
     final start = await getTrialStartDate();
     if (start == null) return false;
     final elapsed = DateTime.now().difference(start);
-    return elapsed.inDays < 14;
+    return elapsed.inDays < 7;
   }
 
   @override
@@ -688,7 +688,7 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
     final start = await getTrialStartDate();
     if (start == null) return 0;
     final elapsed = DateTime.now().difference(start);
-    final remaining = 14 - elapsed.inDays;
+    final remaining = 7 - elapsed.inDays;
     return remaining > 0 ? remaining : 0;
   }
 

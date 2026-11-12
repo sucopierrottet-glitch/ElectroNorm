@@ -5,6 +5,8 @@ import '../models/conductor.dart';
 import '../models/raceway.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
+import 'conduit_bending_screen.dart';
+import 'grounding_screen.dart';
 
 class NecCatalogScreen extends StatefulWidget {
   final void Function(ConductorSpec spec)? onSelectConductor;
@@ -129,6 +131,24 @@ class _NecCatalogScreenState extends State<NecCatalogScreen> {
             title: Text(
               _tr('Catálogo y Tablas NEC', 'NEC Catalog & Tables', 'Catálogo e Tabelas NEC'),
             ),
+            actions: [
+              IconButton(
+                tooltip: _tr('Doblado de Tubería', 'Conduit Bending', 'Dobragem EMT'),
+                icon: const Icon(Icons.architecture_rounded),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ConduitBendingScreen()),
+                ),
+              ),
+              IconButton(
+                tooltip: _tr('Puesta a Tierra NEC 250', 'Grounding NEC 250', 'Aterramento 250'),
+                icon: const Icon(Icons.shield_outlined),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const GroundingScreen()),
+                ),
+              ),
+            ],
           ),
           body: Column(
             children: [
