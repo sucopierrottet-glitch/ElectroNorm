@@ -11,7 +11,8 @@ class BillingService extends ChangeNotifier {
   final StorageService storageService;
 
   StreamSubscription<List<PurchaseDetails>>? _subscription;
-  Map<String, ProductDetails> _products = {};
+  Map<String, ProductDetails> _displayProducts = {};
+  Map<String, ProductDetails> _purchaseProducts = {};
 
   bool _isStoreAvailable = false;
   bool _isLoadingProducts = true;
@@ -29,8 +30,57 @@ class BillingService extends ChangeNotifier {
   String? get lastError => _lastError;
   bool get purchaseSucceeded => _purchaseSucceeded;
 
-  ProductDetails? get monthlyProduct => _products[monthlyProductId];
-  ProductDetails? get yearlyProduct => _products[yearlyProductId];
+  /// Recurring base plan product details used for displaying regular prices.
+  ProductDetails? get monthlyProduct => _displayProducts[monthlyProductId];
+  ProductDetails? get yearlyProduct => _displayProducts[yearlyProductId];
+
+  /// Preferred product details used at checkout (prioritizes free-trial offers).
+  ProductDetails? get monthlyPurchaseProduct =>
+      _purchaseProducts[monthlyProductId] ?? _displayProducts[monthlyProductId];
+  ProductDetails? get yearlyPurchaseProduct =>
+      _purchaseProducts[yearlyProductId] ?? _displayProducts[yearlyProductId];
+
+  /// Whether Google Play returned a free-trial offer (`rawPrice == 0`) for the
+  /// requested subscription tier. Defaults to `true` before catalog load or
+  /// in test mode so standard trial messaging renders consistently.
+  bool hasFreeTrialOffer({required bool isYearly}) {
+    final targetId = isYearly ? yearlyProductId : monthlyProductId;
+    final purchaseProduct = _purchaseProducts[targetId];
+    if (purchaseProduct == null) {
+      return true;
+    }
+    return purchaseProduct.rawPrice == 0;
+  }
+
+  /// Indexes Google Play product details into display (recurring base price)
+  /// and purchase (lowest/free-trial offer) maps.
+  ///
+  /// Google Play Billing returns one entry per eligible offer plus one for the
+  /// base plan under the exact same [ProductDetails.id]. Keeping both roles
+  /// separate guarantees the UI always displays the recurring price while checkout
+  /// always attaches the free-trial offer token when eligible.
+  @visibleForTesting
+  void indexProductDetails(List<ProductDetails> productDetails) {
+    final display = <String, ProductDetails>{};
+    final purchase = <String, ProductDetails>{};
+
+    for (final product in productDetails) {
+      final existingPurchase = purchase[product.id];
+      if (existingPurchase == null || product.rawPrice < existingPurchase.rawPrice) {
+        purchase[product.id] = product;
+      }
+
+      if (product.rawPrice > 0) {
+        final existingDisplay = display[product.id];
+        if (existingDisplay == null || product.rawPrice > existingDisplay.rawPrice) {
+          display[product.id] = product;
+        }
+      }
+    }
+
+    _displayProducts = display;
+    _purchaseProducts = purchase;
+  }
 
   Future<void> init() async {
     if (StorageService.isTestEnvironment) {
@@ -81,9 +131,7 @@ class BillingService extends ChangeNotifier {
       if (response.error != null) {
         _lastError = response.error!.message;
       }
-      _products = {
-        for (final product in response.productDetails) product.id: product,
-      };
+      indexProductDetails(response.productDetails);
     } catch (e) {
       _lastError = e.toString();
     } finally {
@@ -107,11 +155,11 @@ class BillingService extends ChangeNotifier {
     }
 
     final targetId = isYearly ? yearlyProductId : monthlyProductId;
-    var product = _products[targetId];
+    var product = _purchaseProducts[targetId] ?? _displayProducts[targetId];
 
     if (product == null) {
       await loadProducts();
-      product = _products[targetId];
+      product = _purchaseProducts[targetId] ?? _displayProducts[targetId];
     }
 
     if (product == null) {

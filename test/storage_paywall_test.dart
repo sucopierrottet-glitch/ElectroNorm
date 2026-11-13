@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:electronorm/catalogs/conductor_catalog.dart';
@@ -10,9 +11,12 @@ import 'package:electronorm/models/calculation_results.dart';
 import 'package:electronorm/models/conductor.dart';
 import 'package:electronorm/models/raceway.dart';
 import 'package:electronorm/screens/calculator_screen.dart';
+import 'package:electronorm/screens/conduit_bending_screen.dart';
+import 'package:electronorm/screens/grounding_screen.dart';
 import 'package:electronorm/screens/paywall_screen.dart';
 import 'package:electronorm/screens/report_preview_screen.dart';
 import 'package:electronorm/screens/saved_projects_screen.dart';
+import 'package:electronorm/services/billing_service.dart';
 import 'package:electronorm/services/pdf_report_service.dart';
 import 'package:electronorm/services/storage_service.dart';
 import 'package:electronorm/theme/app_theme.dart';
@@ -224,12 +228,12 @@ void main() {
       expect(calculations.first.id, equals('valid-1'));
     });
 
-    test('7. Subscription tier, 14-day free trial lifecycle, and remaining trial days calculation', () async {
+    test('7. Subscription tier, 7-day free trial lifecycle, and remaining trial days calculation', () async {
       expect(await storageService.isProSubscriber(), isFalse);
       expect(await storageService.isTrialActive(), isFalse);
       expect(await storageService.getRemainingTrialDays(), equals(0));
 
-      // Start 14-day trial
+      // Start 7-day trial
       await storageService.startTrial();
       expect(await storageService.isTrialActive(), isTrue);
       expect(await storageService.isProSubscriber(), isTrue);
@@ -529,7 +533,7 @@ void main() {
       expect(find.textContaining('Secret Demo Mode: Pro Status RESET'), findsOneWidget);
     });
 
-    testWidgets('4. Exit-intent rescue dialog displays on back press and offers 14-day trial', (tester) async {
+    testWidgets('4. Exit-intent rescue dialog displays on back press and offers 7-day trial', (tester) async {
       bool? paywallResult;
 
       await tester.pumpWidget(
@@ -570,6 +574,142 @@ void main() {
       expect(paywallResult, isTrue);
       expect(await storageService.isProSubscriber(), isTrue);
       expect(await storageService.isTrialActive(), isTrue);
+    });
+
+    test('5. BillingService separates recurring display price from free-trial offer token regardless of Play list order', () {
+      final service = BillingService(storageService: storageService);
+
+      final monthlyTrialOffer = ProductDetails(
+        id: BillingService.monthlyProductId,
+        title: 'ElectroNorm Pro Monthly (Trial)',
+        description: '7-day free trial then \$8.99/mo',
+        price: 'Free',
+        rawPrice: 0.0,
+        currencyCode: 'USD',
+      );
+      final monthlyBasePlan = ProductDetails(
+        id: BillingService.monthlyProductId,
+        title: 'ElectroNorm Pro Monthly',
+        description: 'Monthly base plan',
+        price: '\$8.99',
+        rawPrice: 8.99,
+        currencyCode: 'USD',
+      );
+      final yearlyBasePlan = ProductDetails(
+        id: BillingService.yearlyProductId,
+        title: 'ElectroNorm Pro Yearly',
+        description: 'Yearly base plan',
+        price: '\$69.00',
+        rawPrice: 69.00,
+        currencyCode: 'USD',
+      );
+      final yearlyTrialOffer = ProductDetails(
+        id: BillingService.yearlyProductId,
+        title: 'ElectroNorm Pro Yearly (Trial)',
+        description: '7-day free trial then \$69.00/yr',
+        price: '\$0.00',
+        rawPrice: 0.0,
+        currencyCode: 'USD',
+      );
+
+      // Order A: Trial offer first, Base plan second (previously Base plan overwrote Trial offer!)
+      service.indexProductDetails([
+        monthlyTrialOffer,
+        monthlyBasePlan,
+        yearlyTrialOffer,
+        yearlyBasePlan,
+      ]);
+      expect(service.monthlyProduct?.price, equals('\$8.99'));
+      expect(service.yearlyProduct?.price, equals('\$69.00'));
+      expect(service.monthlyPurchaseProduct?.rawPrice, equals(0.0));
+      expect(service.yearlyPurchaseProduct?.rawPrice, equals(0.0));
+      expect(service.hasFreeTrialOffer(isYearly: false), isTrue);
+      expect(service.hasFreeTrialOffer(isYearly: true), isTrue);
+
+      // Order B: Base plan first, Trial offer second (previously UI showed "Free/mo"!)
+      service.indexProductDetails([
+        monthlyBasePlan,
+        monthlyTrialOffer,
+        yearlyBasePlan,
+        yearlyTrialOffer,
+      ]);
+      expect(service.monthlyProduct?.price, equals('\$8.99'));
+      expect(service.yearlyProduct?.price, equals('\$69.00'));
+      expect(service.monthlyPurchaseProduct?.rawPrice, equals(0.0));
+      expect(service.yearlyPurchaseProduct?.rawPrice, equals(0.0));
+      expect(service.hasFreeTrialOffer(isYearly: false), isTrue);
+      expect(service.hasFreeTrialOffer(isYearly: true), isTrue);
+
+      // Case C: Returning customer (only Base plans returned, no trial offer)
+      service.indexProductDetails([monthlyBasePlan, yearlyBasePlan]);
+      expect(service.monthlyProduct?.price, equals('\$8.99'));
+      expect(service.yearlyProduct?.price, equals('\$69.00'));
+      expect(service.monthlyPurchaseProduct?.rawPrice, equals(8.99));
+      expect(service.yearlyPurchaseProduct?.rawPrice, equals(69.00));
+      expect(service.hasFreeTrialOffer(isYearly: false), isFalse);
+      expect(service.hasFreeTrialOffer(isYearly: true), isFalse);
+    });
+
+    testWidgets('6. ConduitBendingScreen & GroundingScreen render all tabs without overflow on 360dp screen', (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      final errorMessages = <String>[];
+      final originalOnError = FlutterError.onError;
+      FlutterError.onError = (details) => errorMessages.add(details.exceptionAsString());
+
+      try {
+        await storageService.setLocale('en');
+        await tester.pumpWidget(
+          MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.25)),
+            child: const MaterialApp(
+              home: ConduitBendingScreen(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        final bendingTabs = find.byType(Tab);
+        final bendingTabCount = bendingTabs.evaluate().length;
+        expect(bendingTabCount, equals(4));
+        for (var i = 0; i < bendingTabCount; i++) {
+          await tester.ensureVisible(bendingTabs.at(i));
+          await tester.pumpAndSettle();
+          await tester.tap(bendingTabs.at(i));
+          await tester.pumpAndSettle();
+        }
+
+        await tester.pumpWidget(
+          MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.25)),
+            child: const MaterialApp(
+              home: GroundingScreen(),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        // Enable voltage drop upsize checkbox in EGC tab
+        await tester.tap(find.byType(CheckboxListTile));
+        await tester.pumpAndSettle();
+
+        // Switch through all Grounding tabs (EGC + GEC)
+        final groundingTabs = find.byType(Tab);
+        final groundingTabCount = groundingTabs.evaluate().length;
+        expect(groundingTabCount, equals(2));
+        for (var i = 0; i < groundingTabCount; i++) {
+          await tester.ensureVisible(groundingTabs.at(i));
+          await tester.pumpAndSettle();
+          await tester.tap(groundingTabs.at(i));
+          await tester.pumpAndSettle();
+        }
+
+        expect(errorMessages, isEmpty, reason: 'Unexpected Flutter/overflow errors: $errorMessages');
+      } finally {
+        FlutterError.onError = originalOnError;
+      }
     });
   });
 

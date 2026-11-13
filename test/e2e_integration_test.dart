@@ -618,7 +618,7 @@ void main() {
       expect(find.byKey(const Key('dialogRescue')), findsOneWidget);
       expect(find.text('Wait! Unlock 7 Days Free'), findsOneWidget);
 
-      // User claims 14-day free trial
+      // User claims 7-day free trial
       await tester.tap(find.byKey(const Key('btnRescueClaimTrial')));
       await tester.pumpAndSettle();
 

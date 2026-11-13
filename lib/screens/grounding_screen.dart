@@ -143,29 +143,32 @@ class _GroundingScreenState extends State<GroundingScreen>
                   },
                 ),
                 const SizedBox(height: 16),
-                CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  activeColor: AppColors.compliant,
-                  title: Text(
-                    _tr(
-                      '¿Conductores de fase sobredimensionados? (NEC 250.122(B))',
-                      'Phase conductors upsized for voltage drop? (NEC 250.122(B))',
-                      'Condutores de fase superdimensionados? (NEC 250.122(B))',
+                Material(
+                  color: Colors.transparent,
+                  child: CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    activeColor: AppColors.compliant,
+                    title: Text(
+                      _tr(
+                        '¿Conductores de fase sobredimensionados? (NEC 250.122(B))',
+                        'Phase conductors upsized for voltage drop? (NEC 250.122(B))',
+                        'Condutores de fase superdimensionados? (NEC 250.122(B))',
+                      ),
+                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
                     ),
-                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(
-                    _tr(
-                      'Si aumentaste el cable por caída de tensión, el EGC debe aumentarse proporcionalmente.',
-                      'If phase wire was upsized for voltage drop, EGC must be scaled proportionally in circular mils.',
-                      'O condutor de aterramento deve aumentar proporcionalmente.',
+                    subtitle: Text(
+                      _tr(
+                        'Si aumentaste el cable por caída de tensión, el EGC debe aumentarse proporcionalmente.',
+                        'If phase wire was upsized for voltage drop, EGC must be scaled proportionally in circular mils.',
+                        'O condutor de aterramento deve aumentar proporcionalmente.',
+                      ),
+                      style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
                     ),
-                    style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+                    value: _enableVoltageDropUpsize,
+                    onChanged: (val) {
+                      setState(() => _enableVoltageDropUpsize = val ?? false);
+                    },
                   ),
-                  value: _enableVoltageDropUpsize,
-                  onChanged: (val) {
-                    setState(() => _enableVoltageDropUpsize = val ?? false);
-                  },
                 ),
                 if (_enableVoltageDropUpsize) ...[
                   const SizedBox(height: 12),
@@ -174,6 +177,7 @@ class _GroundingScreenState extends State<GroundingScreen>
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           initialValue: _stdPhaseConductor,
+                          isExpanded: true,
                           decoration: InputDecoration(
                             labelText: _tr('Calibre Estándar', 'Original Gauge', 'Bitola Padrão'),
                             filled: true,
@@ -181,7 +185,10 @@ class _GroundingScreenState extends State<GroundingScreen>
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                           items: _commonWireGauges.map((g) {
-                            return DropdownMenuItem(value: g, child: Text(g));
+                            return DropdownMenuItem(
+                              value: g,
+                              child: Text(g, overflow: TextOverflow.ellipsis),
+                            );
                           }).toList(),
                           onChanged: (val) {
                             if (val != null) setState(() => _stdPhaseConductor = val);
@@ -192,6 +199,7 @@ class _GroundingScreenState extends State<GroundingScreen>
                       Expanded(
                         child: DropdownButtonFormField<String>(
                           initialValue: _upsizedPhaseConductor,
+                          isExpanded: true,
                           decoration: InputDecoration(
                             labelText: _tr('Calibre Aumentado', 'Upsized Gauge', 'Bitola Aumentada'),
                             filled: true,
@@ -199,7 +207,10 @@ class _GroundingScreenState extends State<GroundingScreen>
                             border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                           items: _commonWireGauges.map((g) {
-                            return DropdownMenuItem(value: g, child: Text(g));
+                            return DropdownMenuItem(
+                              value: g,
+                              child: Text(g, overflow: TextOverflow.ellipsis),
+                            );
                           }).toList(),
                           onChanged: (val) {
                             if (val != null) setState(() => _upsizedPhaseConductor = val);
@@ -306,6 +317,7 @@ class _GroundingScreenState extends State<GroundingScreen>
                       flex: 3,
                       child: DropdownButtonFormField<String>(
                         initialValue: _serviceConductorSize,
+                        isExpanded: true,
                         decoration: InputDecoration(
                           labelText: _tr('Calibre del Conductor de Fase',
                               'Largest Phase Conductor', 'Bitola do Condutor'),
@@ -314,7 +326,10 @@ class _GroundingScreenState extends State<GroundingScreen>
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                         items: _commonWireGauges.map((g) {
-                          return DropdownMenuItem(value: g, child: Text(g));
+                          return DropdownMenuItem(
+                            value: g,
+                            child: Text(g, overflow: TextOverflow.ellipsis),
+                          );
                         }).toList(),
                         onChanged: (val) {
                           if (val != null) setState(() => _serviceConductorSize = val);
@@ -523,22 +538,29 @@ class _GroundingScreenState extends State<GroundingScreen>
     bool isHighlight = false,
   }) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.baseline,
+      textBaseline: TextBaseline.alphabetic,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: isHighlight ? 14 : 13,
-            fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
-            color: AppColors.textSecondary,
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: isHighlight ? 14 : 13,
+              fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
+              color: AppColors.textSecondary,
+            ),
           ),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: isHighlight ? 20 : 15,
-            fontWeight: FontWeight.w900,
-            color: isHighlight ? AppColors.compliant : Colors.white,
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: TextStyle(
+              fontSize: isHighlight ? 20 : 15,
+              fontWeight: FontWeight.w900,
+              color: isHighlight ? AppColors.compliant : Colors.white,
+            ),
           ),
         ),
       ],

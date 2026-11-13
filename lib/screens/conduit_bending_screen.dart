@@ -155,6 +155,7 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
                 const SizedBox(height: 16),
                 DropdownButtonFormField<BendAngle>(
                   initialValue: _offsetAngle,
+                  isExpanded: true,
                   decoration: InputDecoration(
                     labelText: _tr('Ángulo de Doblado', 'Bend Angle', 'Ângulo de Dobra'),
                     filled: true,
@@ -165,8 +166,9 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
                     return DropdownMenuItem(
                       value: angle,
                       child: Text(
-                        '${angle.degrees.toStringAsFixed(angle.degrees % 1 == 0 ? 0 : 1)}° (Multiplicador: ${angle.multiplier}x)',
+                        '${angle.degrees.toStringAsFixed(angle.degrees % 1 == 0 ? 0 : 1)}° (${_tr('Multiplicador', 'Multiplier', 'Multiplicador')}: ${angle.multiplier}x)',
                         style: const TextStyle(fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     );
                   }).toList(),
@@ -270,6 +272,7 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
                     Expanded(
                       child: DropdownButtonFormField<BendingConduitType>(
                         initialValue: _stubConduitType,
+                        isExpanded: true,
                         decoration: InputDecoration(
                           labelText: _tr('Tipo de Tubo', 'Conduit Type', 'Tipo de Tubo'),
                           filled: true,
@@ -279,7 +282,11 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
                         items: BendingConduitType.values.map((t) {
                           return DropdownMenuItem(
                             value: t,
-                            child: Text(t.displayName, style: const TextStyle(fontSize: 13)),
+                            child: Text(
+                              t.displayName,
+                              style: const TextStyle(fontSize: 13),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           );
                         }).toList(),
                         onChanged: (val) {
@@ -291,6 +298,7 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
                     Expanded(
                       child: DropdownButtonFormField<String>(
                         initialValue: _stubTradeSize,
+                        isExpanded: true,
                         decoration: InputDecoration(
                           labelText: _tr('Calibre / Tamaño', 'Trade Size', 'Bitola'),
                           filled: true,
@@ -398,6 +406,7 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
                 const SizedBox(height: 16),
                 DropdownButtonFormField<double>(
                   initialValue: _saddle3CenterAngle,
+                  isExpanded: true,
                   decoration: InputDecoration(
                     labelText: _tr('Ángulo de la Curva Central', 'Center Bend Angle',
                         'Ângulo da Curva Central'),
@@ -405,18 +414,39 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
                     fillColor: AppColors.surfaceCard,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   ),
-                  items: const [
+                  items: [
                     DropdownMenuItem(
                       value: 45.0,
-                      child: Text('45° Centro (22.5° laterales) — Estándar Industrial'),
+                      child: Text(
+                        _tr(
+                          '45° Centro (22.5° laterales) — Estándar',
+                          '45° Center (22.5° outer) — Standard',
+                          '45° Centro (22.5° laterais) — Padrão',
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     DropdownMenuItem(
                       value: 30.0,
-                      child: Text('30° Centro (15° laterales) — Perfil bajo'),
+                      child: Text(
+                        _tr(
+                          '30° Centro (15° laterales) — Perfil bajo',
+                          '30° Center (15° outer) — Low profile',
+                          '30° Centro (15° laterais) — Perfil baixo',
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     DropdownMenuItem(
                       value: 60.0,
-                      child: Text('60° Centro (30° laterales) — Obstáculos altos'),
+                      child: Text(
+                        _tr(
+                          '60° Centro (30° laterales) — Obstáculo alto',
+                          '60° Center (30° outer) — High obstacle',
+                          '60° Centro (30° laterais) — Obstáculo alto',
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   ],
                   onChanged: (val) {
@@ -533,6 +563,7 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
                 const SizedBox(height: 16),
                 DropdownButtonFormField<BendAngle>(
                   initialValue: _saddle4Angle,
+                  isExpanded: true,
                   decoration: InputDecoration(
                     labelText: _tr('Ángulo de las 4 Curvas', 'Angle for all 4 bends',
                         'Ângulo das 4 curvas'),
@@ -544,8 +575,9 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
                     return DropdownMenuItem(
                       value: angle,
                       child: Text(
-                        '${angle.degrees.toStringAsFixed(angle.degrees % 1 == 0 ? 0 : 1)}° (Multiplicador: ${angle.multiplier}x)',
+                        '${angle.degrees.toStringAsFixed(angle.degrees % 1 == 0 ? 0 : 1)}° (${_tr('Multiplicador', 'Multiplier', 'Multiplicador')}: ${angle.multiplier}x)',
                         style: const TextStyle(fontWeight: FontWeight.w600),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     );
                   }).toList(),
@@ -687,10 +719,10 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
     bool isHighlight = false,
   }) {
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.baseline,
-      textBaseline: TextBaseline.alphabetic,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Expanded(
+          flex: 3,
           child: Text(
             label,
             style: TextStyle(
@@ -701,26 +733,31 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
           ),
         ),
         const SizedBox(width: 8),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(
-              primaryValue,
-              style: TextStyle(
-                fontSize: isHighlight ? 20 : 15,
-                fontWeight: FontWeight.w900,
-                color: isHighlight ? AppTheme.accent : Colors.white,
-              ),
-            ),
-            if (secondaryValue.isNotEmpty)
+        Expanded(
+          flex: 2,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
               Text(
-                secondaryValue,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
+                primaryValue,
+                textAlign: TextAlign.end,
+                style: TextStyle(
+                  fontSize: isHighlight ? 20 : 15,
+                  fontWeight: FontWeight.w900,
+                  color: isHighlight ? AppTheme.accent : Colors.white,
                 ),
               ),
-          ],
+              if (secondaryValue.isNotEmpty)
+                Text(
+                  secondaryValue,
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+            ],
+          ),
         ),
       ],
     );

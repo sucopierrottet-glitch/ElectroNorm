@@ -234,7 +234,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
   }
 
   Future<bool> _handlePopAttempt() async {
-    if (_isPro || _hasPromptedRescue) {
+    final hasAnyTrial = _billingService.hasFreeTrialOffer(isYearly: false) ||
+        _billingService.hasFreeTrialOffer(isYearly: true);
+    if (_isPro || _hasPromptedRescue || !hasAnyTrial) {
       return true;
     }
     _hasPromptedRescue = true;
@@ -340,6 +342,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
         _selectedTier == PaywallTier.annual ? annualPriceText : monthlyPriceText;
     final hasSelectedPrice =
         selectedProduct != null || StorageService.isTestEnvironment;
+    final hasAnnualTrial = _billingService.hasFreeTrialOffer(isYearly: true);
+    final hasMonthlyTrial = _billingService.hasFreeTrialOffer(isYearly: false);
+    final selectedHasTrial =
+        _selectedTier == PaywallTier.annual ? hasAnnualTrial : hasMonthlyTrial;
 
     return PopScope(
       canPop: false,
@@ -481,7 +487,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                         title: 'Annual Pass',
                         price: annualPriceText,
                         periodDetail: annualPeriodDetail,
-                        badgeText: '7-DAY FREE TRIAL',
+                        badgeText: hasAnnualTrial ? '7-DAY FREE TRIAL' : null,
                         savingsText: 'BEST VALUE • SAVE 36%',
                         isRecommended: true,
                       ),
@@ -495,7 +501,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                         title: 'Monthly Subscription',
                         price: monthlyPriceText,
                         periodDetail: 'Flexible monthly billing • Cancel anytime',
-                        badgeText: '7-DAY FREE TRIAL',
+                        badgeText: hasMonthlyTrial ? '7-DAY FREE TRIAL' : null,
                         savingsText: null,
                         isRecommended: false,
                       ),
@@ -526,9 +532,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                     color: Colors.black,
                                   ),
                                 )
-                              : const Text(
-                                  'Start 7-Day Free Trial',
-                                  style: TextStyle(
+                              : Text(
+                                  selectedHasTrial
+                                      ? 'Start 7-Day Free Trial'
+                                      : (hasSelectedPrice
+                                          ? 'Subscribe Now — $selectedPriceText'
+                                          : 'Subscribe Now'),
+                                  style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 0.3,
@@ -540,9 +550,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
                       const SizedBox(height: 12),
 
                       Text(
-                        hasSelectedPrice
-                            ? '7 days free, then $selectedPriceText. Cancel anytime in Google Play.'
-                            : '7 days free, then standard plan rate. Cancel anytime in Google Play.',
+                        selectedHasTrial
+                            ? (hasSelectedPrice
+                                ? '7 days free, then $selectedPriceText. Cancel anytime in Google Play.'
+                                : '7 days free, then standard plan rate. Cancel anytime in Google Play.')
+                            : (hasSelectedPrice
+                                ? 'Recurring billing ($selectedPriceText). Cancel anytime in Google Play.'
+                                : 'Recurring billing. Cancel anytime in Google Play.'),
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
                       ),

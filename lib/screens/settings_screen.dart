@@ -45,11 +45,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
+    _storage.addListener(_onStorageChanged);
     _loadSettings();
+  }
+
+  void _onStorageChanged() {
+    _refreshSubscriptionStatus();
+  }
+
+  Future<void> _refreshSubscriptionStatus() async {
+    final storage = _storage;
+    final isPro = await storage.isProSubscriber();
+    final isTrial = await storage.isTrialActive();
+    final days = await storage.getRemainingTrialDays();
+    if (!mounted) return;
+    if (isPro != _isPro || isTrial != _isTrial || days != _remainingTrialDays) {
+      setState(() {
+        _isPro = isPro;
+        _isTrial = isTrial;
+        _remainingTrialDays = days;
+      });
+    }
   }
 
   @override
   void dispose() {
+    _storage.removeListener(_onStorageChanged);
     _nameController.dispose();
     _companyController.dispose();
     _licenseController.dispose();
