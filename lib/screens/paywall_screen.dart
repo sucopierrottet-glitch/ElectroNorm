@@ -16,7 +16,7 @@ class PaywallScreen extends StatefulWidget {
 }
 
 class _PaywallScreenState extends State<PaywallScreen> {
-  PaywallTier _selectedTier = PaywallTier.annual;
+  PaywallTier _selectedTier = PaywallTier.monthly;
   bool _isPro = false;
   bool _isLoading = true;
   bool _hasPromptedRescue = false;
@@ -296,13 +296,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
     if (claimTrial == true) {
       if (StorageService.isTestEnvironment) {
         await StorageService.instance.startTrial();
-        await StorageService.instance.setSubscriptionTier('annual');
+        await StorageService.instance.setSubscriptionTier('monthly');
         if (mounted) {
           Navigator.of(context).pop(true);
         }
         return false;
       }
-      setState(() => _selectedTier = PaywallTier.annual);
+      setState(() => _selectedTier = PaywallTier.monthly);
       await _subscribe();
       return false;
     }
@@ -334,6 +334,12 @@ class _PaywallScreenState extends State<PaywallScreen> {
     final annualPeriodDetail = yearlyProduct != null
         ? _tr('Facturado anualmente • Cancela cuando quieras', 'Billed annually • Cancel anytime', 'Cobrado anualmente • Cancele quando quiser')
         : (StorageService.isTestEnvironment ? '\$5.75/month • Billed annually' : _tr('Facturado anualmente', 'Billed annually', 'Cobrado anualmente'));
+    final selectedProduct =
+        _selectedTier == PaywallTier.annual ? yearlyProduct : monthlyProduct;
+    final selectedPriceText =
+        _selectedTier == PaywallTier.annual ? annualPriceText : monthlyPriceText;
+    final hasSelectedPrice =
+        selectedProduct != null || StorageService.isTestEnvironment;
 
     return PopScope(
       canPop: false,
@@ -482,14 +488,14 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
                       const SizedBox(height: 12),
 
-                      // Tier 1: Monthly Plan ($8.99/mo)
+                      // Tier 1: Monthly Plan ($8.99/mo with 7-Day Free Trial)
                       _buildTierCard(
                         key: const Key('cardTierMonthly'),
                         tier: PaywallTier.monthly,
                         title: 'Monthly Subscription',
                         price: monthlyPriceText,
                         periodDetail: 'Flexible monthly billing • Cancel anytime',
-                        badgeText: null,
+                        badgeText: '7-DAY FREE TRIAL',
                         savingsText: null,
                         isRecommended: false,
                       ),
@@ -520,11 +526,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                     color: Colors.black,
                                   ),
                                 )
-                              : Text(
-                                  _selectedTier == PaywallTier.annual
-                                      ? 'Start 7-Day Free Trial'
-                                      : 'Subscribe Now — $monthlyPriceText',
-                                  style: const TextStyle(
+                              : const Text(
+                                  'Start 7-Day Free Trial',
+                                  style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 0.3,
@@ -536,9 +540,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                       const SizedBox(height: 12),
 
                       Text(
-                        _selectedTier == PaywallTier.annual
-                            ? '7 days free, then $annualPriceText. Cancel anytime in Google Play.'
-                            : 'Recurring billing. Cancel anytime in Google Play.',
+                        hasSelectedPrice
+                            ? '7 days free, then $selectedPriceText. Cancel anytime in Google Play.'
+                            : '7 days free, then standard plan rate. Cancel anytime in Google Play.',
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
                       ),

@@ -426,7 +426,7 @@ void main() {
       StorageService.instance = storageService;
     });
 
-    testWidgets('1. Displays both pricing tiers (\$8.99/mo and \$69.00/yr) with 14-day trial badge', (tester) async {
+    testWidgets('1. Displays both pricing tiers (\$8.99/mo and \$69.00/yr) with 7-day trial badge', (tester) async {
       await tester.pumpWidget(
         const MaterialApp(
           themeMode: ThemeMode.dark,
@@ -441,13 +441,17 @@ void main() {
 
       expect(find.text('\$69.00/yr'), findsOneWidget);
       expect(find.text('\$8.99/mo'), findsOneWidget);
-      expect(find.text('7-DAY FREE TRIAL'), findsOneWidget);
+      expect(find.text('7-DAY FREE TRIAL'), findsNWidgets(2));
       expect(find.text('BEST VALUE • SAVE 36%'), findsOneWidget);
       expect(find.byKey(const Key('btnSubscribePaywall')), findsOneWidget);
       expect(find.text('Start 7-Day Free Trial'), findsOneWidget);
+      expect(
+        find.text('7 days free, then \$8.99/mo. Cancel anytime in Google Play.'),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('2. Tapping Monthly tier updates selected plan and CTA button text', (tester) async {
+    testWidgets('2. Monthly tier is selected by default and tapping Annual tier updates billing disclaimer', (tester) async {
       tester.view.physicalSize = const Size(1080, 2400);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
@@ -460,10 +464,27 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(
+        find.text('7 days free, then \$8.99/mo. Cancel anytime in Google Play.'),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.byKey(const Key('cardTierAnnual')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Start 7-Day Free Trial'), findsOneWidget);
+      expect(
+        find.text('7 days free, then \$69.00/yr. Cancel anytime in Google Play.'),
+        findsOneWidget,
+      );
+
       await tester.tap(find.byKey(const Key('cardTierMonthly')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Subscribe Now — \$8.99/mo'), findsOneWidget);
+      expect(
+        find.text('7 days free, then \$8.99/mo. Cancel anytime in Google Play.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('3. 5-tap secret demo toggle enables Pro status without store credentials', (tester) async {
