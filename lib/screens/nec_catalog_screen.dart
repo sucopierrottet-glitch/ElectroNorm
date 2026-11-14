@@ -40,7 +40,10 @@ class _NecCatalogScreenState extends State<NecCatalogScreen> {
     super.dispose();
   }
 
-  List<_CatalogEntry> _buildEntries() {
+  List<_CatalogEntry> _buildEntries({
+    required bool isMetric,
+    required bool isMexico,
+  }) {
     final List<_CatalogEntry> entries = [];
 
     // 1. Copper THHN Conductors
@@ -50,12 +53,14 @@ class _NecCatalogScreenState extends State<NecCatalogScreen> {
         insulation: ConductorInsulation.thhn,
         material: ConductorMaterial.copper,
       );
+      final areaMm2 = (specCu.areaSqInches * 645.16).toStringAsFixed(1);
       entries.add(_CatalogEntry(
         id: 'cu_thhn_$gauge',
         category: 'cu',
         title: '$gauge THHN/THWN-2 — ${_tr('Cobre (Cu)', 'Copper (Cu)', 'Cobre (Cu)')}',
-        subtitle:
-            'Ø ${specCu.outerDiameterInches.toStringAsFixed(3)}" (${specCu.outerDiameterMm.toStringAsFixed(1)} mm) • Área: ${specCu.areaSqInches.toStringAsFixed(4)} in²',
+        subtitle: isMetric
+            ? 'Ø ${specCu.outerDiameterMm.toStringAsFixed(1)} mm (${specCu.outerDiameterInches.toStringAsFixed(3)}") • ${_tr('Área', 'Area', 'Área')}: $areaMm2 mm² (${specCu.areaSqInches.toStringAsFixed(4)} in²)'
+            : 'Ø ${specCu.outerDiameterInches.toStringAsFixed(3)}" (${specCu.outerDiameterMm.toStringAsFixed(1)} mm) • ${_tr('Área', 'Area', 'Área')}: ${specCu.areaSqInches.toStringAsFixed(4)} in²',
         badgePrimary: '${specCu.ampacity75C.toInt()}A @75°C',
         badgeSecondary: '${specCu.ampacity90C.toInt()}A @90°C',
         isConductor: true,
@@ -70,12 +75,14 @@ class _NecCatalogScreenState extends State<NecCatalogScreen> {
         insulation: ConductorInsulation.xhhw,
         material: ConductorMaterial.aluminum,
       );
+      final areaMm2 = (specAl.areaSqInches * 645.16).toStringAsFixed(1);
       entries.add(_CatalogEntry(
         id: 'al_xhhw_$gauge',
         category: 'al',
         title: '$gauge XHHW-2 — ${_tr('Aluminio (Al)', 'Aluminum (Al)', 'Alumínio (Al)')}',
-        subtitle:
-            'Ø ${specAl.outerDiameterInches.toStringAsFixed(3)}" (${specAl.outerDiameterMm.toStringAsFixed(1)} mm) • Área: ${specAl.areaSqInches.toStringAsFixed(4)} in²',
+        subtitle: isMetric
+            ? 'Ø ${specAl.outerDiameterMm.toStringAsFixed(1)} mm (${specAl.outerDiameterInches.toStringAsFixed(3)}") • ${_tr('Área', 'Area', 'Área')}: $areaMm2 mm² (${specAl.areaSqInches.toStringAsFixed(4)} in²)'
+            : 'Ø ${specAl.outerDiameterInches.toStringAsFixed(3)}" (${specAl.outerDiameterMm.toStringAsFixed(1)} mm) • ${_tr('Área', 'Area', 'Área')}: ${specAl.areaSqInches.toStringAsFixed(4)} in²',
         badgePrimary: '${specAl.ampacity75C.toInt()}A @75°C',
         badgeSecondary: '${specAl.ampacity90C.toInt()}A @90°C',
         isConductor: true,
@@ -89,11 +96,18 @@ class _NecCatalogScreenState extends State<NecCatalogScreen> {
       entries.add(_CatalogEntry(
         id: 'raceway_${profile.type.name}_${profile.tradeSize}',
         category: isPvc ? 'pvc' : 'metal',
-        title: '${profile.tradeSize}" ${profile.type.displayName} (DN ${profile.metricDesignator})',
-        subtitle:
-            'ID: ${profile.internalDiameterInches.toStringAsFixed(3)}" • Total: ${profile.internalAreaSqInches.toStringAsFixed(3)} in² (${profile.internalAreaSqMm.toStringAsFixed(0)} mm²)',
-        badgePrimary: '40%: ${profile.fill40AreaSqInches.toStringAsFixed(3)} in²',
-        badgeSecondary: '60%: ${profile.fill60AreaSqInches.toStringAsFixed(3)} in²',
+        title: isMetric
+            ? 'DN ${profile.metricDesignator} (${profile.tradeSize}") ${profile.type.displayName}'
+            : '${profile.tradeSize}" ${profile.type.displayName} (DN ${profile.metricDesignator})',
+        subtitle: isMetric
+            ? 'ID: ${profile.internalDiameterMm.toStringAsFixed(1)} mm (${profile.internalDiameterInches.toStringAsFixed(3)}") • Total: ${profile.internalAreaSqMm.toStringAsFixed(0)} mm² (${profile.internalAreaSqInches.toStringAsFixed(3)} in²)'
+            : 'ID: ${profile.internalDiameterInches.toStringAsFixed(3)}" • Total: ${profile.internalAreaSqInches.toStringAsFixed(3)} in² (${profile.internalAreaSqMm.toStringAsFixed(0)} mm²)',
+        badgePrimary: isMetric
+            ? '40%: ${(profile.fill40AreaSqInches * 645.16).toStringAsFixed(0)} mm²'
+            : '40%: ${profile.fill40AreaSqInches.toStringAsFixed(3)} in²',
+        badgeSecondary: isMetric
+            ? '60%: ${(profile.fill60AreaSqInches * 645.16).toStringAsFixed(0)} mm²'
+            : '60%: ${profile.fill60AreaSqInches.toStringAsFixed(3)} in²',
         isConductor: false,
         racewayProfile: profile,
       ));
@@ -107,7 +121,10 @@ class _NecCatalogScreenState extends State<NecCatalogScreen> {
     return ListenableBuilder(
       listenable: StorageService.instance,
       builder: (context, _) {
-        final allEntries = _buildEntries();
+        final storage = StorageService.instance;
+        final isMetric = storage.isMetric;
+        final isMexico = storage.isMexicoProfile;
+        final allEntries = _buildEntries(isMetric: isMetric, isMexico: isMexico);
         final categories = <String, String>{
           'all': _tr('Todos', 'All', 'Todos'),
           'cu': _tr('Conductores Cobre', 'Copper Conductors', 'Condutores Cobre'),
@@ -129,7 +146,10 @@ class _NecCatalogScreenState extends State<NecCatalogScreen> {
           backgroundColor: AppTheme.darkBg,
           appBar: AppBar(
             title: Text(
-              _tr('Catálogo y Tablas NEC', 'NEC Catalog & Tables', 'Catálogo e Tabelas NEC'),
+              isMexico
+                  ? _tr('Catálogo y Tablas NOM-001', 'NOM-001 Catalog & Tables',
+                      'Catálogo e Tabelas NOM-001')
+                  : _tr('Catálogo y Tablas NEC', 'NEC Catalog & Tables', 'Catálogo e Tabelas NEC'),
             ),
             actions: [
               IconButton(
@@ -141,7 +161,9 @@ class _NecCatalogScreenState extends State<NecCatalogScreen> {
                 ),
               ),
               IconButton(
-                tooltip: _tr('Puesta a Tierra NEC 250', 'Grounding NEC 250', 'Aterramento 250'),
+                tooltip: isMexico
+                    ? _tr('Puesta a Tierra NOM 250', 'Grounding NOM 250', 'Aterramento 250')
+                    : _tr('Puesta a Tierra NEC 250', 'Grounding NEC 250', 'Aterramento 250'),
                 icon: const Icon(Icons.shield_outlined),
                 onPressed: () => Navigator.push(
                   context,
@@ -161,11 +183,17 @@ class _NecCatalogScreenState extends State<NecCatalogScreen> {
                       controller: _searchCtrl,
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
-                        hintText: _tr(
-                          'Buscar calibre (ej: 12 AWG, 250 kcmil) o tubería (ej: 3/4 EMT)...',
-                          'Search gauge (e.g. 12 AWG, 250 kcmil) or conduit (e.g. 3/4 EMT)...',
-                          'Buscar bitola (ex: 12 AWG) ou eletroduto (ex: 3/4 EMT)...',
-                        ),
+                        hintText: isMetric
+                            ? _tr(
+                                'Buscar calibre (ej: 12 AWG) o tubo (ej: DN 21 / 3/4 EMT)...',
+                                'Search gauge (e.g. 12 AWG) or conduit (e.g. DN 21 / 3/4 EMT)...',
+                                'Buscar bitola (ex: 12 AWG) ou eletroduto (ex: DN 21)...',
+                              )
+                            : _tr(
+                                'Buscar calibre (ej: 12 AWG, 250 kcmil) o tubería (ej: 3/4 EMT)...',
+                                'Search gauge (e.g. 12 AWG, 250 kcmil) or conduit (e.g. 3/4 EMT)...',
+                                'Buscar bitola (ex: 12 AWG) ou eletroduto (ex: 3/4 EMT)...',
+                              ),
                         prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF94A3B8)),
                         suffixIcon: _searchQuery.isNotEmpty
                             ? IconButton(

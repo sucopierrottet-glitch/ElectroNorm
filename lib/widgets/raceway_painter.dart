@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../models/conductor.dart';
+import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import 'packing_algorithm.dart';
 
@@ -232,171 +233,226 @@ class RacewayVisualizer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final packed = packingAlgorithm.pack(
-      conduitRadius: conduitRadiusInches,
-      groups: groups,
-    );
+    return ListenableBuilder(
+      listenable: StorageService.instance,
+      builder: (context, _) {
+        final storage = StorageService.instance;
+        final lang = storage.localeCode.toLowerCase();
+        final isSpanish = lang.startsWith('es');
+        final isPortuguese = lang.startsWith('pt');
+        final isMetric = storage.isMetric;
+        final country = storage.normativeCountry;
 
-    final statusColor = AppColors.getFillStatusColor(
-      fillPercentage: fillPercentage,
-      maxAllowedFill: maxAllowedFill,
-    );
+        final packed = packingAlgorithm.pack(
+          conduitRadius: conduitRadiusInches,
+          groups: groups,
+        );
 
-    final statusText = fillPercentage <= maxAllowedFill + 0.0001
-        ? 'COMPLIANT'
-        : (fillPercentage <= 50.0 ? 'CAUTION' : 'OVERFILLED');
+        final statusColor = AppColors.getFillStatusColor(
+          fillPercentage: fillPercentage,
+          maxAllowedFill: maxAllowedFill,
+        );
 
-    final statusIcon = fillPercentage <= maxAllowedFill + 0.0001
-        ? Icons.check_circle
-        : (fillPercentage <= 50.0 ? Icons.warning_amber_rounded : Icons.error);
+        final bool isCompliant = fillPercentage <= maxAllowedFill + 0.0001;
+        final bool isCaution = fillPercentage <= 50.0;
+        final String statusText;
+        if (isSpanish) {
+          statusText = isCompliant ? 'CUMPLE' : (isCaution ? 'PRECAUCIÓN' : 'EXCEDIDO');
+        } else if (isPortuguese) {
+          statusText = isCompliant ? 'CONFORME' : (isCaution ? 'ATENÇÃO' : 'EXCEDIDO');
+        } else {
+          statusText = isCompliant ? 'COMPLIANT' : (isCaution ? 'CAUTION' : 'OVERFILLED');
+        }
 
-    final totalWires = groups.fold<int>(0, (sum, g) => sum + g.count);
+        final statusIcon = isCompliant
+            ? Icons.check_circle
+            : (isCaution ? Icons.warning_amber_rounded : Icons.error);
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderSubtle, width: 1.2),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Header Row: Occupancy Badge & Percentage Indicator
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        final totalWires = groups.fold<int>(0, (sum, g) => sum + g.count);
+
+        final sizeLabel = NormativeFormatters.formatRacewaySize(
+          tradeSize,
+          isMetric: isMetric,
+        );
+
+        final idInches = (conduitRadiusInches * 2.0).toStringAsFixed(3);
+        final idMm = (conduitRadiusInches * 50.8).toStringAsFixed(1);
+        final idText = isMetric
+            ? '${isSpanish || isPortuguese ? 'DI' : 'ID'}: $idMm mm ($idInches")'
+            : 'ID: $idInches" ($idMm mm)';
+
+        final String countText;
+        if (isSpanish) {
+          countText = '$totalWires conductor${totalWires == 1 ? "" : "es"}';
+        } else if (isPortuguese) {
+          countText = '$totalWires condutor${totalWires == 1 ? "" : "es"}';
+        } else {
+          countText = '$totalWires conductor${totalWires == 1 ? "" : "s"} packed';
+        }
+
+        final String maxLabel = isSpanish || isPortuguese ? 'máx' : 'max';
+        final ratioStr = jamRatio?.toStringAsFixed(2) ?? '3.00';
+        final String jamAlertText;
+        if (isSpanish) {
+          jamAlertText =
+              'RIESGO CRÍTICO DE ATASCAMIENTO (Relación $ratioStr): Los conductores pueden acuñarse en curvas (${country.jamRatioRef})';
+        } else if (isPortuguese) {
+          jamAlertText =
+              'RISCO CRÍTICO DE TRAVAMENTO (Razão $ratioStr): Condutores podem travar em curvas (${country.jamRatioRef})';
+        } else {
+          jamAlertText =
+              'CRITICAL JAM RISK (Ratio $ratioStr): Conductors may wedge tight on bends (${country.jamRatioRef})';
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceCard,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.borderSubtle, width: 1.2),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // Occupancy Pill
-              Flexible(
-                flex: 3,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              // Header Row: Occupancy Badge & Percentage Indicator
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Occupancy Pill
+                  Flexible(
+                    flex: 3,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: statusColor.withValues(alpha: 0.16),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                            color: statusColor.withValues(alpha: 0.5), width: 1.0),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(statusIcon, size: 14, color: statusColor),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              '$statusText — ${fillPercentage.toStringAsFixed(1)}% / ${maxAllowedFill.toStringAsFixed(0)}% $maxLabel',
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: statusColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(width: 8),
+
+                  // Conduit spec subtitle
+                  Flexible(
+                    flex: 2,
+                    child: Text(
+                      '$sizeLabel $racewayType',
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              // Jam Ratio Warning Pill (if within hazard zone: 2.80 <= R_jam <= 3.20)
+              if (hasJamRisk ||
+                  (jamRatio != null && jamRatio! >= 2.80 && jamRatio! <= 3.20)) ...[
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: statusColor.withValues(alpha: 0.5), width: 1.0),
+                    color: AppColors.caution.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.caution, width: 1.2),
                   ),
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(statusIcon, size: 14, color: statusColor),
-                      const SizedBox(width: 5),
-                      Flexible(
+                      const Icon(Icons.warning, size: 16, color: AppColors.caution),
+                      const SizedBox(width: 6),
+                      Expanded(
                         child: Text(
-                          '$statusText — ${fillPercentage.toStringAsFixed(1)}% / ${maxAllowedFill.toStringAsFixed(0)}% max',
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: statusColor,
+                          jamAlertText,
+                          style: const TextStyle(
+                            color: AppColors.caution,
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
-                            letterSpacing: 0.3,
                           ),
                         ),
                       ),
                     ],
                   ),
                 ),
-              ),
+              ],
 
-              const SizedBox(width: 8),
+              const SizedBox(height: 10),
 
-              // Conduit spec subtitle
-              Flexible(
-                flex: 2,
-                child: Text(
-                  '$tradeSize" $racewayType',
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.end,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
+              // Canvas Vector Cross-Section
+              SizedBox(
+                height: 190,
+                width: double.infinity,
+                child: CustomPaint(
+                  painter: RacewayPainter(
+                    conduitRadiusInches: conduitRadiusInches,
+                    positions: packed,
+                    fillPercentage: fillPercentage,
+                    maxAllowedFill: maxAllowedFill,
                   ),
                 ),
               ),
-            ],
-          ),
 
-          // Jam Ratio Warning Pill (if within hazard zone: 2.80 <= R_jam <= 3.20)
-          if (hasJamRisk || (jamRatio != null && jamRatio! >= 2.80 && jamRatio! <= 3.20)) ...[
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.caution.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: AppColors.caution, width: 1.2),
-              ),
-              child: Row(
+              const SizedBox(height: 8),
+
+              // Footer Info Row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Icon(Icons.warning, size: 16, color: AppColors.caution),
-                  const SizedBox(width: 6),
-                  Expanded(
+                  Flexible(
                     child: Text(
-                      'CRITICAL JAM RISK (Ratio ${jamRatio?.toStringAsFixed(2) ?? "3.00"}): Conductors may wedge tight on bends (NEC Ch 9)',
+                      idText,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: AppColors.caution,
+                        color: AppColors.textTertiary,
                         fontSize: 11,
-                        fontWeight: FontWeight.w700,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      countText,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
-
-          const SizedBox(height: 10),
-
-          // Canvas Vector Cross-Section
-          SizedBox(
-            height: 190,
-            width: double.infinity,
-            child: CustomPaint(
-              painter: RacewayPainter(
-                conduitRadiusInches: conduitRadiusInches,
-                positions: packed,
-                fillPercentage: fillPercentage,
-                maxAllowedFill: maxAllowedFill,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          // Footer Info Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Text(
-                  'ID: ${(conduitRadiusInches * 2.0).toStringAsFixed(3)}" (${(conduitRadiusInches * 50.8).toStringAsFixed(1)} mm)',
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.textTertiary,
-                    fontSize: 11,
-                    fontFamily: 'monospace',
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  '$totalWires conductor${totalWires == 1 ? "" : "s"} packed',
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.end,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

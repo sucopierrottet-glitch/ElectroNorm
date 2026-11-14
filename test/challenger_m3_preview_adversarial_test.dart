@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:printing/printing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:signature/signature.dart';
 
 import 'package:electronorm/calculators/conduit_fill_calculator.dart';
@@ -15,6 +16,7 @@ import 'package:electronorm/models/conductor.dart';
 import 'package:electronorm/models/raceway.dart';
 import 'package:electronorm/screens/report_preview_screen.dart';
 import 'package:electronorm/services/pdf_report_service.dart';
+import 'package:electronorm/services/storage_service.dart';
 import 'package:electronorm/theme/app_theme.dart';
 import 'package:electronorm/widgets/signature_dialog.dart';
 
@@ -29,7 +31,12 @@ void main() {
   late DeratingResult standardDerate;
   late ComplianceReportData sampleData;
 
-  setUp(() {
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    StorageService.instance = SharedPreferencesStorageService();
+    await StorageService.instance.setLocale('en');
+    await StorageService.instance.setNormativeCountry(NormativeCountry.usa);
+
     standardEmt = RacewayCatalog.getProfile(RacewayType.emt, '3/4');
     spec10ThhnCu = ConductorCatalog.getSpec(
       gauge: '10 AWG',

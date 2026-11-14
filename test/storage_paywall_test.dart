@@ -268,6 +268,8 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       storageService = SharedPreferencesStorageService();
       StorageService.instance = storageService;
+      await storageService.setLocale('en');
+      await storageService.setNormativeCountry(NormativeCountry.usa);
 
       // Seed 3 calculations with different fill and jam characteristics
       await storageService.saveCalculation(createSampleCalculation(
@@ -407,6 +409,8 @@ void main() {
 
     testWidgets('5. Empty state renders when all items deleted', (tester) async {
       await storageService.clearAll();
+      await storageService.setLocale('en');
+      await storageService.setNormativeCountry(NormativeCountry.usa);
 
       await tester.pumpWidget(
         const MaterialApp(
@@ -428,6 +432,8 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       storageService = SharedPreferencesStorageService();
       StorageService.instance = storageService;
+      await storageService.setLocale('en');
+      await storageService.setNormativeCountry(NormativeCountry.usa);
     });
 
     testWidgets('1. Displays both pricing tiers (\$8.99/mo and \$69.00/yr) with 7-day trial badge', (tester) async {
@@ -720,6 +726,8 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       storageService = SharedPreferencesStorageService();
       StorageService.instance = storageService;
+      await storageService.setLocale('en');
+      await storageService.setNormativeCountry(NormativeCountry.usa);
     });
 
     testWidgets('1. Contains btnSavedProjectsAppBar and btnSaveProject actions', (tester) async {
@@ -837,6 +845,8 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       storageService = SharedPreferencesStorageService();
       StorageService.instance = storageService;
+      await storageService.setLocale('en');
+      await storageService.setNormativeCountry(NormativeCountry.usa);
     });
 
     testWidgets('1. Free tier navigation to ReportPreview allows signature dialog without crash', (tester) async {

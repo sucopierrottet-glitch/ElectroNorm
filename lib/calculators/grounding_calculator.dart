@@ -38,6 +38,28 @@ enum ElectrodeType {
   final String nameEn;
   final String? ruleCap;
   const ElectrodeType(this.nameEs, this.nameEn, this.ruleCap);
+
+  String localizedName({required bool isSpanish, required bool isMexico}) {
+    if (!isMexico) return isSpanish ? nameEs : nameEn;
+    switch (this) {
+      case ElectrodeType.waterPipeOrBuildingSteel:
+        return isSpanish
+            ? 'Tubería metálica de agua / Estructura (NOM 250-52(a)(1)/(2))'
+            : 'Metal Water Pipe / Building Steel (NOM 250-52(a)(1)/(2))';
+      case ElectrodeType.rodPipePlate:
+        return isSpanish
+            ? 'Electrodo de varilla, tubo o placa (NOM 250-52(a)(5))'
+            : 'Rod, Pipe, or Plate Electrode (NOM 250-52(a)(5))';
+      case ElectrodeType.concreteEncasedUfer:
+        return isSpanish
+            ? 'Electrodo embebido en concreto / Ufer (NOM 250-52(a)(3))'
+            : 'Concrete-Encased Electrode / Ufer (NOM 250-52(a)(3))';
+      case ElectrodeType.groundRing:
+        return isSpanish
+            ? 'Anillo de tierra perimetral (NOM 250-52(a)(4))'
+            : 'Ground Ring (NOM 250-52(a)(4))';
+    }
+  }
 }
 
 class EgcResult {
@@ -135,7 +157,7 @@ class GroundingCalculator {
     {'maxOcpd': 6000, 'cu': '800 kcmil', 'al': '1200 kcmil'},
   ];
 
-  /// Calculate Equipment Grounding Conductor (EGC) per NEC 250.122
+  /// Calculate Equipment Grounding Conductor (EGC) per NEC 250.122 / NOM-001-SEDE 250-122
   /// [ocpdRating]: Overcurrent protective device rating in Amps (e.g. 15, 20, 60, 100, 200...)
   /// [upsizedPhase]: Optional upsized phase conductor for voltage drop adjustment (NEC 250.122(B))
   /// [standardPhase]: Standard phase conductor before upsizing
@@ -143,6 +165,7 @@ class GroundingCalculator {
     required int ocpdRating,
     String? standardPhase,
     String? upsizedPhase,
+    bool isMexico = false,
   }) {
     // Find matching row in Table 250.122
     Map<String, dynamic> row = _table250_122.firstWhere(
@@ -153,7 +176,7 @@ class GroundingCalculator {
     String cu = row['cu'] as String;
     String al = row['al'] as String;
 
-    // Check NEC 250.122(B) proportional increase
+    // Check NEC 250.122(B) / NOM 250-122(b) proportional increase
     if (standardPhase != null &&
         upsizedPhase != null &&
         standardPhase != upsizedPhase) {
@@ -170,14 +193,18 @@ class GroundingCalculator {
         final reqAlCm = baseAlCm * ratio;
         final adjustedAl = _findNextWireSize(reqAlCm);
 
+        final codeRef = isMexico ? 'NOM-001-SEDE 250-122(b)' : 'NEC 250.122(B)';
+
         return EgcResult(
           ocpdRating: ocpdRating,
           cuSize: adjustedCu,
           alSize: adjustedAl,
           isAdjustedForVoltageDrop: true,
           adjustmentNote:
-              'Aumentado proporcionalmente por NEC 250.122(B) (+${((ratio - 1) * 100).toStringAsFixed(0)}% por caída de tensión). Base: $cu Cu / $al Al.',
-          necReference: 'NEC Table 250.122 & 250.122(B)',
+              'Aumentado proporcionalmente por $codeRef (+${((ratio - 1) * 100).toStringAsFixed(0)}% por caída de tensión). Base: $cu Cu / $al Al.',
+          necReference: isMexico
+              ? 'NOM-001-SEDE Tabla 250-122 y 250-122(b)'
+              : 'NEC Table 250.122 & 250.122(B)',
         );
       }
     }
@@ -187,11 +214,11 @@ class GroundingCalculator {
       cuSize: cu,
       alSize: al,
       isAdjustedForVoltageDrop: false,
-      necReference: 'NEC Table 250.122',
+      necReference: isMexico ? 'NOM-001-SEDE Tabla 250-122' : 'NEC Table 250.122',
     );
   }
 
-  /// Calculate Grounding Electrode Conductor (GEC) per NEC Table 250.66
+  /// Calculate Grounding Electrode Conductor (GEC) per NEC Table 250.66 / NOM-001-SEDE 250-66
   /// [serviceSize]: Largest service-entrance conductor or equivalent parallel sum (e.g. '2/0 AWG', '500 kcmil')
   /// [serviceMaterial]: Copper or Aluminum
   /// [electrodeType]: Type of electrode to apply caps per 250.66(A), (B), or (C)
@@ -199,6 +226,7 @@ class GroundingCalculator {
     required String serviceSize,
     required GroundingConductorMaterial serviceMaterial,
     required ElectrodeType electrodeType,
+    bool isMexico = false,
   }) {
     final cm = wireCircularMils[serviceSize] ?? 66360; // Default to 2 AWG if not found
 
@@ -269,32 +297,36 @@ class GroundingCalculator {
     }
 
     String? appliedException;
+    final prefix = isMexico ? 'NOM-001-SEDE ' : 'NEC ';
 
     // Apply specific electrode rules
     switch (electrodeType) {
       case ElectrodeType.rodPipePlate:
-        // NEC 250.66(A): Max 6 AWG Cu or 4 AWG Al required
+        // NEC 250.66(A) / NOM 250-66(a): Max 6 AWG Cu or 4 AWG Al required
         if ((wireCircularMils[cu] ?? 0) > (wireCircularMils['6 AWG'] ?? 0)) {
+          final art = isMexico ? '250-66(a)' : '250.66(A)';
           appliedException =
-              'Limitado por NEC 250.66(A): No se requiere mayor a 6 AWG Cu (o 4 AWG Al) para electrodo de varilla/tubo/placa.';
+              'Limitado por $prefix$art: No se requiere mayor a 6 AWG Cu (o 4 AWG Al) para electrodo de varilla/tubo/placa.';
           cu = '6 AWG';
           al = '4 AWG';
         }
         break;
       case ElectrodeType.concreteEncasedUfer:
-        // NEC 250.66(B): Max 4 AWG Cu required
+        // NEC 250.66(B) / NOM 250-66(b): Max 4 AWG Cu required
         if ((wireCircularMils[cu] ?? 0) > (wireCircularMils['4 AWG'] ?? 0)) {
+          final art = isMexico ? '250-66(b)' : '250.66(B)';
           appliedException =
-              'Limitado por NEC 250.66(B): No se requiere mayor a 4 AWG Cu para electrodo embebido en concreto (Ufer).';
+              'Limitado por $prefix$art: No se requiere mayor a 4 AWG Cu para electrodo embebido en concreto (Ufer).';
           cu = '4 AWG';
           al = '2 AWG';
         }
         break;
       case ElectrodeType.groundRing:
-        // NEC 250.66(C): Not required to be larger than ring conductor (min 2 AWG Cu)
+        // NEC 250.66(C) / NOM 250-66(c): Not required to be larger than ring conductor (min 2 AWG Cu)
         if ((wireCircularMils[cu] ?? 0) > (wireCircularMils['2 AWG'] ?? 0)) {
+          final art = isMexico ? '250-66(c)' : '250.66(C)';
           appliedException =
-              'Limitado por NEC 250.66(C): No se requiere mayor al conductor del anillo perimetral (mín. 2 AWG Cu).';
+              'Limitado por $prefix$art: No se requiere mayor al conductor del anillo perimetral (mín. 2 AWG Cu).';
           cu = '2 AWG';
           al = '1/0 AWG';
         }
@@ -304,6 +336,14 @@ class GroundingCalculator {
         break;
     }
 
+    final tableRef = isMexico ? 'NOM-001-SEDE Tabla 250-66' : 'NEC Table 250.66';
+    final ruleCapLabel = isMexico && electrodeType.ruleCap != null
+        ? electrodeType.ruleCap!
+            .replaceAll('NEC 250.66(A)', 'NOM 250-66(a)')
+            .replaceAll('NEC 250.66(B)', 'NOM 250-66(b)')
+            .replaceAll('NEC 250.66(C)', 'NOM 250-66(c)')
+        : electrodeType.ruleCap;
+
     return GecResult(
       serviceSize: serviceSize,
       serviceMaterial: serviceMaterial,
@@ -311,9 +351,7 @@ class GroundingCalculator {
       cuSize: cu,
       alSize: al,
       appliedException: appliedException,
-      necReference: electrodeType.ruleCap != null
-          ? 'NEC Table 250.66 & ${electrodeType.ruleCap}'
-          : 'NEC Table 250.66',
+      necReference: ruleCapLabel != null ? '$tableRef & $ruleCapLabel' : tableRef,
     );
   }
 

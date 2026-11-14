@@ -97,6 +97,8 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     storageService = SharedPreferencesStorageService();
     StorageService.instance = storageService;
+    await storageService.setLocale('en');
+    await storageService.setNormativeCountry(NormativeCountry.usa);
   });
 
   // =========================================================================

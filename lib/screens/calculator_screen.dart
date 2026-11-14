@@ -60,6 +60,7 @@ class CalculatorScreenState extends State<CalculatorScreen> {
   double _circuitLengthFeet = 100.0;
   double _loadCurrentAmps = 16.0;
   double _powerFactor = 0.90;
+  late NormativeCountry _lastCountry;
 
   // Derating Parameters
   double _ambientTempC = 30.0;
@@ -83,6 +84,9 @@ class CalculatorScreenState extends State<CalculatorScreen> {
     _showVoltageDrop = !widget.startEmpty;
     _showThermalDerating = !widget.startEmpty;
 
+    _lastCountry = StorageService.instance.normativeCountry;
+    _nominalVoltage = _lastCountry.defaultSinglePhaseVoltage;
+
     if (!widget.startEmpty) {
       _loadDefaultPreset();
     }
@@ -91,6 +95,25 @@ class CalculatorScreenState extends State<CalculatorScreen> {
   }
 
   void _onStorageChanged() {
+    final newCountry = StorageService.instance.normativeCountry;
+    if (newCountry != _lastCountry) {
+      _lastCountry = newCountry;
+      if (mounted) {
+        setState(() {
+          if (newCountry == NormativeCountry.mexico) {
+            if (_nominalVoltage == 120.0) _nominalVoltage = 127.0;
+            if (_nominalVoltage == 208.0) _nominalVoltage = 220.0;
+            if (_nominalVoltage == 480.0) _nominalVoltage = 440.0;
+          } else {
+            if (_nominalVoltage == 127.0) _nominalVoltage = 120.0;
+            if (_nominalVoltage == 220.0) _nominalVoltage = 208.0;
+            if (_nominalVoltage == 440.0) _nominalVoltage = 480.0;
+          }
+        });
+      }
+    } else if (mounted) {
+      setState(() {});
+    }
     _refreshSubscriptionState();
   }
 
@@ -137,7 +160,11 @@ class CalculatorScreenState extends State<CalculatorScreen> {
         SnackBar(
           backgroundColor: AppColors.surfaceElevated,
           content: Text(
-            'Loaded "${calc.title}" into calculator',
+            _tr(
+              'Cálculo "${calc.title}" cargado',
+              'Loaded "${calc.title}" into calculator',
+              'Cálculo "${calc.title}" carregado',
+            ),
             style: const TextStyle(color: AppColors.textPrimary),
           ),
           behavior: SnackBarBehavior.floating,
@@ -183,14 +210,20 @@ class CalculatorScreenState extends State<CalculatorScreen> {
       _selectedTradeSize = profile.tradeSize;
     });
     if (mounted) {
+      final sizeStr = NormativeFormatters.formatRacewaySize(
+        profile.tradeSize,
+        type: profile.type,
+        metricDesignator: profile.metricDesignator,
+        isMetric: StorageService.instance.isMetric,
+      );
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: AppTheme.primary,
           content: Text(
             _tr(
-              'Tubería seleccionada: ${profile.tradeSize}" ${profile.type.displayName}',
-              'Selected raceway: ${profile.tradeSize}" ${profile.type.displayName}',
-              'Eletroduto selecionado: ${profile.tradeSize}" ${profile.type.displayName}',
+              'Tubería seleccionada: $sizeStr ${profile.type.displayName}',
+              'Selected raceway: $sizeStr ${profile.type.displayName}',
+              'Eletroduto selecionado: $sizeStr ${profile.type.displayName}',
             ),
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
           ),
@@ -207,6 +240,8 @@ class CalculatorScreenState extends State<CalculatorScreen> {
       _selectedRacewayType = RacewayType.emt;
       _selectedTradeSize = '3/4';
       _isNipple = false;
+      _nominalVoltage =
+          StorageService.instance.normativeCountry.defaultSinglePhaseVoltage;
       if (widget.startEmpty) {
         _showPresets = false;
         _showVoltageDrop = false;
@@ -351,6 +386,64 @@ class CalculatorScreenState extends State<CalculatorScreen> {
     setState(() {
       _conductorGroups.clear();
       switch (name) {
+        case 'preset_mx_mono_127':
+          _selectedRacewayType = RacewayType.emt;
+          _selectedTradeSize = '1/2';
+          final spec12 = ConductorCatalog.getSpec(gauge: '12 AWG');
+          _conductorGroups.addAll([
+            ConductorGroup(id: 'p1', spec: spec12, count: 1, role: 'phaseA'),
+            ConductorGroup(id: 'p2', spec: spec12, count: 1, role: 'neutral'),
+            ConductorGroup(id: 'p3', spec: spec12, count: 1, role: 'ground'),
+          ]);
+          _loadCurrentAmps = 16.0;
+          _nominalVoltage = 127.0;
+          _circuitPhase = CircuitPhase.singlePhase;
+          break;
+
+        case 'preset_mx_bif_220':
+          _selectedRacewayType = RacewayType.emt;
+          _selectedTradeSize = '3/4';
+          final spec10 = ConductorCatalog.getSpec(gauge: '10 AWG');
+          _conductorGroups.addAll([
+            ConductorGroup(id: 'p1', spec: spec10, count: 1, role: 'phaseA'),
+            ConductorGroup(id: 'p2', spec: spec10, count: 1, role: 'phaseB'),
+            ConductorGroup(id: 'p3', spec: spec10, count: 1, role: 'ground'),
+          ]);
+          _loadCurrentAmps = 24.0;
+          _nominalVoltage = 220.0;
+          _circuitPhase = CircuitPhase.singlePhase;
+          break;
+
+        case 'preset_mx_tri_220':
+          _selectedRacewayType = RacewayType.emt;
+          _selectedTradeSize = '1';
+          final spec8 = ConductorCatalog.getSpec(gauge: '8 AWG');
+          final spec10 = ConductorCatalog.getSpec(gauge: '10 AWG');
+          _conductorGroups.addAll([
+            ConductorGroup(id: 'p1', spec: spec8, count: 1, role: 'phaseA'),
+            ConductorGroup(id: 'p2', spec: spec8, count: 1, role: 'phaseB'),
+            ConductorGroup(id: 'p3', spec: spec8, count: 1, role: 'phaseC'),
+            ConductorGroup(id: 'p4', spec: spec10, count: 1, role: 'ground'),
+          ]);
+          _loadCurrentAmps = 40.0;
+          _nominalVoltage = 220.0;
+          _circuitPhase = CircuitPhase.threePhase;
+          break;
+
+        case 'preset_mx_alim_440':
+          _selectedRacewayType = RacewayType.emt;
+          _selectedTradeSize = '2-1/2';
+          final spec250 = ConductorCatalog.getSpec(gauge: '250 kcmil');
+          final spec4 = ConductorCatalog.getSpec(gauge: '4 AWG');
+          _conductorGroups.addAll([
+            ConductorGroup(id: 'p1', spec: spec250, count: 3, role: 'phaseA'),
+            ConductorGroup(id: 'p2', spec: spec4, count: 1, role: 'ground'),
+          ]);
+          _loadCurrentAmps = 230.0;
+          _nominalVoltage = 440.0;
+          _circuitPhase = CircuitPhase.threePhase;
+          break;
+
         case 'preset_3x10_1x12':
           _selectedRacewayType = RacewayType.emt;
           _selectedTradeSize = '3/4';
@@ -422,10 +515,11 @@ class CalculatorScreenState extends State<CalculatorScreen> {
   }
 
   void _openReportPreview() {
+    final storage = StorageService.instance;
     final reportData = ComplianceReportData(
-      projectTitle: 'Field Conduit Run #1',
-      clientName: 'Commercial Client',
-      siteAddress: 'Facility Electrical Room B',
+      projectTitle: _tr('Tramo de Tubería #1', 'Field Conduit Run #1', 'Trecho de Eletroduto #1'),
+      clientName: _tr('Cliente Comercial', 'Commercial Client', 'Cliente Comercial'),
+      siteAddress: _tr('Cuarto Eléctrico / Tablero', 'Facility Electrical Room B', 'Quadro Elétrico'),
       technicianName: _technicianProfile.technicianName,
       companyName: _technicianProfile.companyName,
       licenseNumber: _technicianProfile.licenseNumber,
@@ -445,6 +539,9 @@ class CalculatorScreenState extends State<CalculatorScreen> {
       terminalRatingC: _terminalRatingC,
       cccCount: _calculatedCccCount,
       signaturePngBytes: _technicianProfile.defaultSignatureBytes,
+      localeCode: storage.localeCode,
+      normativeCountry: storage.normativeCountry,
+      useMetricUnits: storage.isMetric,
     );
 
     Navigator.of(context).push(
@@ -470,6 +567,26 @@ class CalculatorScreenState extends State<CalculatorScreen> {
     await _refreshSubscriptionState();
   }
 
+  Future<void> _toggleCountryQuickly() async {
+    final storage = StorageService.instance;
+    final next = storage.normativeCountry == NormativeCountry.mexico
+        ? NormativeCountry.usa
+        : NormativeCountry.mexico;
+    await storage.setNormativeCountry(next, syncUnits: true);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: AppColors.surfaceElevated,
+        content: Text(
+          '${next.flagEmoji} ${_tr("Norma activa", "Active standard", "Norma ativa")}: ${next.codeBadge}',
+          style: const TextStyle(color: AppColors.textPrimary),
+        ),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _showSaveCalculationDialog() async {
     final canSave = await StorageService.instance.canCreateProject();
     if (!canSave) {
@@ -480,9 +597,20 @@ class CalculatorScreenState extends State<CalculatorScreen> {
     }
     if (!mounted) return;
 
+    final storage = StorageService.instance;
+    final isMetric = storage.isMetric;
     final totalConds = _conductorGroups.fold(0, (sum, g) => sum + g.count);
-    final defaultTitle =
-        'Run #${totalConds}W - ${_currentRacewayProfile.tradeSize}" ${_currentRacewayProfile.type.displayName}';
+    final sizeLabel = NormativeFormatters.formatRacewaySize(
+      _currentRacewayProfile.tradeSize,
+      type: _currentRacewayProfile.type,
+      metricDesignator: _currentRacewayProfile.metricDesignator,
+      isMetric: isMetric,
+    );
+    final defaultTitle = _tr(
+      'Circuito #${totalConds}C - $sizeLabel ${_currentRacewayProfile.type.displayName}',
+      'Run #${totalConds}W - $sizeLabel ${_currentRacewayProfile.type.displayName}',
+      'Circuito #${totalConds}C - $sizeLabel ${_currentRacewayProfile.type.displayName}',
+    );
     final titleController = TextEditingController(text: defaultTitle);
     final clientController = TextEditingController();
     final notesController = TextEditingController();
@@ -492,14 +620,14 @@ class CalculatorScreenState extends State<CalculatorScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surfaceCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.bookmark_add, color: AppColors.compliant, size: 24),
-            SizedBox(width: 8),
+            const Icon(Icons.bookmark_add, color: AppColors.compliant, size: 24),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Save Calculation Run',
-                style: TextStyle(color: AppColors.textPrimary, fontSize: 18),
+                _tr('Guardar Cálculo', 'Save Calculation Run', 'Salvar Cálculo'),
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 18),
               ),
             ),
           ],
@@ -512,9 +640,10 @@ class CalculatorScreenState extends State<CalculatorScreen> {
               TextField(
                 key: const Key('inputSaveTitle'),
                 controller: titleController,
-                decoration: const InputDecoration(
-                  labelText: 'Project / Calculation Title *',
-                  labelStyle: TextStyle(color: AppColors.textSecondary),
+                decoration: InputDecoration(
+                  labelText: _tr('Título del Proyecto / Cálculo *',
+                      'Project / Calculation Title *', 'Título do Projeto *'),
+                  labelStyle: const TextStyle(color: AppColors.textSecondary),
                 ),
                 style: const TextStyle(color: AppColors.textPrimary),
               ),
@@ -522,9 +651,10 @@ class CalculatorScreenState extends State<CalculatorScreen> {
               TextField(
                 key: const Key('inputSaveClient'),
                 controller: clientController,
-                decoration: const InputDecoration(
-                  labelText: 'Client / Site Name (Optional)',
-                  labelStyle: TextStyle(color: AppColors.textSecondary),
+                decoration: InputDecoration(
+                  labelText: _tr('Cliente / Obra (Opcional)',
+                      'Client / Site Name (Optional)', 'Cliente / Local (Opcional)'),
+                  labelStyle: const TextStyle(color: AppColors.textSecondary),
                 ),
                 style: const TextStyle(color: AppColors.textPrimary),
               ),
@@ -532,9 +662,10 @@ class CalculatorScreenState extends State<CalculatorScreen> {
               TextField(
                 key: const Key('inputSaveNotes'),
                 controller: notesController,
-                decoration: const InputDecoration(
-                  labelText: 'Notes / Panel Location (Optional)',
-                  labelStyle: TextStyle(color: AppColors.textSecondary),
+                decoration: InputDecoration(
+                  labelText: _tr('Notas / Tablero (Opcional)',
+                      'Notes / Panel Location (Optional)', 'Notas / Quadro (Opcional)'),
+                  labelStyle: const TextStyle(color: AppColors.textSecondary),
                 ),
                 style: const TextStyle(color: AppColors.textPrimary),
               ),
@@ -544,7 +675,8 @@ class CalculatorScreenState extends State<CalculatorScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            child: Text(_tr('Cancelar', 'Cancel', 'Cancelar'),
+                style: const TextStyle(color: AppColors.textSecondary)),
           ),
           ElevatedButton(
             key: const Key('btnConfirmSaveCalculation'),
@@ -554,7 +686,7 @@ class CalculatorScreenState extends State<CalculatorScreen> {
             ),
             onPressed: () async {
               final title = titleController.text.trim().isEmpty
-                  ? 'Conduit Run'
+                  ? _tr('Tramo de Tubería', 'Conduit Run', 'Trecho')
                   : titleController.text.trim();
               final now = DateTime.now();
               final savedItem = SavedCalculation(
@@ -585,7 +717,11 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                   SnackBar(
                     backgroundColor: AppColors.surfaceElevated,
                     content: Text(
-                      'Saved "$title" to projects',
+                      _tr(
+                        'Guardado "$title" en proyectos',
+                        'Saved "$title" to projects',
+                        'Salvo "$title" em projetos',
+                      ),
                       style: const TextStyle(color: AppColors.textPrimary),
                     ),
                     behavior: SnackBarBehavior.floating,
@@ -593,7 +729,10 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                 );
               }
             },
-            child: const Text('Save Run', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(
+              _tr('Guardar', 'Save Run', 'Salvar'),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -624,6 +763,7 @@ class CalculatorScreenState extends State<CalculatorScreen> {
     ConductorInsulation selectedInsulation = ConductorInsulation.thhn;
     ConductorMaterial selectedMaterial = ConductorMaterial.copper;
     int quantity = 1;
+    final isMetric = StorageService.instance.isMetric;
 
     showModalBottomSheet(
       context: context,
@@ -650,9 +790,10 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Add Conductor Group',
-                          style: TextStyle(
+                        Text(
+                          _tr('Agregar Grupo de Conductores', 'Add Conductor Group',
+                              'Adicionar Grupo de Condutores'),
+                          style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: AppColors.textPrimary,
@@ -667,14 +808,21 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                     const Divider(color: AppColors.borderSubtle),
 
                     // Gauge Selector
-                    const Text('Conductor Gauge',
-                        style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    Text(
+                      _tr('Calibre del Conductor', 'Conductor Gauge', 'Bitola do Condutor'),
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    ),
                     const SizedBox(height: 4),
                     DropdownButtonFormField<String>(
                       initialValue: selectedGauge,
                       dropdownColor: AppColors.surfaceCardHover,
                       items: ConductorCatalog.standardAwgGauges.map((g) {
-                        return DropdownMenuItem(value: g, child: Text(g));
+                        return DropdownMenuItem(
+                          value: g,
+                          child: Text(
+                            NormativeFormatters.formatAwgWithMetric(g, isMetric: isMetric),
+                          ),
+                        );
                       }).toList(),
                       onChanged: (val) {
                         if (val != null) setDialogState(() => selectedGauge = val);
@@ -683,22 +831,24 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                     const SizedBox(height: 12),
 
                     // Role Selector
-                    const Text('Circuit Role',
-                        style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    Text(
+                      _tr('Rol en el Circuito', 'Circuit Role', 'Função no Circuito'),
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    ),
                     const SizedBox(height: 4),
                     Wrap(
                       spacing: 8,
                       children: [
-                        _buildRoleChip('phaseA', 'Phase A', selectedRole,
-                            (r) => setDialogState(() => selectedRole = r)),
-                        _buildRoleChip('phaseB', 'Phase B', selectedRole,
-                            (r) => setDialogState(() => selectedRole = r)),
-                        _buildRoleChip('phaseC', 'Phase C', selectedRole,
-                            (r) => setDialogState(() => selectedRole = r)),
-                        _buildRoleChip('neutral', 'Neutral', selectedRole,
-                            (r) => setDialogState(() => selectedRole = r)),
-                        _buildRoleChip('ground', 'Ground', selectedRole,
-                            (r) => setDialogState(() => selectedRole = r)),
+                        _buildRoleChip('phaseA', _tr('Fase A', 'Phase A', 'Fase A'),
+                            selectedRole, (r) => setDialogState(() => selectedRole = r)),
+                        _buildRoleChip('phaseB', _tr('Fase B', 'Phase B', 'Fase B'),
+                            selectedRole, (r) => setDialogState(() => selectedRole = r)),
+                        _buildRoleChip('phaseC', _tr('Fase C', 'Phase C', 'Fase C'),
+                            selectedRole, (r) => setDialogState(() => selectedRole = r)),
+                        _buildRoleChip('neutral', _tr('Neutro', 'Neutral', 'Neutro'),
+                            selectedRole, (r) => setDialogState(() => selectedRole = r)),
+                        _buildRoleChip('ground', _tr('Tierra', 'Ground', 'Terra'),
+                            selectedRole, (r) => setDialogState(() => selectedRole = r)),
                       ],
                     ),
                     const SizedBox(height: 12),
@@ -710,8 +860,11 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Insulation',
-                                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                              Text(
+                                _tr('Aislamiento', 'Insulation', 'Isolação'),
+                                style: const TextStyle(
+                                    color: AppColors.textSecondary, fontSize: 12),
+                              ),
                               const SizedBox(height: 4),
                               DropdownButtonFormField<ConductorInsulation>(
                                 initialValue: selectedInsulation,
@@ -734,8 +887,11 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Material',
-                                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                              Text(
+                                _tr('Material', 'Material', 'Material'),
+                                style: const TextStyle(
+                                    color: AppColors.textSecondary, fontSize: 12),
+                              ),
                               const SizedBox(height: 4),
                               DropdownButtonFormField<ConductorMaterial>(
                                 initialValue: selectedMaterial,
@@ -760,9 +916,11 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                     // Quantity Stepper
                     Row(
                       children: [
-                        const Text('Quantity:',
-                            style: TextStyle(
-                                color: AppColors.textPrimary, fontWeight: FontWeight.bold)),
+                        Text(
+                          _tr('Cantidad:', 'Quantity:', 'Quantidade:'),
+                          style: const TextStyle(
+                              color: AppColors.textPrimary, fontWeight: FontWeight.bold),
+                        ),
                         const Spacer(),
                         IconButton(
                           icon: const Icon(Icons.remove_circle_outline,
@@ -791,7 +949,8 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                       width: double.infinity,
                       child: ElevatedButton.icon(
                         icon: const Icon(Icons.add),
-                        label: const Text('Add to Schedule'),
+                        label: Text(
+                            _tr('Agregar al Cálculo', 'Add to Schedule', 'Adicionar ao Cálculo')),
                         onPressed: () {
                           final spec = ConductorCatalog.getSpec(
                             gauge: selectedGauge,
@@ -843,12 +1002,25 @@ class CalculatorScreenState extends State<CalculatorScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final storage = StorageService.instance;
+    final country = storage.normativeCountry;
+    final isMexico = storage.isMexicoProfile;
+    final isMetric = storage.isMetric;
+
     final fill = _fillResult;
     final raceway = _currentRacewayProfile;
     final vDrop = _voltageDropResult;
     final derate = _deratingResult;
     final hasSubtitle = _technicianProfile.companyName.isNotEmpty ||
         _technicianProfile.technicianName.isNotEmpty;
+
+    final upsizeSizeLabel = fill.recommendedUpsizeTradeSize != null
+        ? NormativeFormatters.formatRacewaySize(
+            fill.recommendedUpsizeTradeSize!,
+            type: raceway.type,
+            isMetric: isMetric,
+          )
+        : '';
 
     return Scaffold(
       appBar: AppBar(
@@ -957,13 +1129,13 @@ class CalculatorScreenState extends State<CalculatorScreen> {
           IconButton(
             key: const Key('btnClearCalculation'),
             icon: const Icon(Icons.refresh_rounded, size: 20),
-            tooltip: 'Limpiar / Nuevo',
+            tooltip: _tr('Limpiar / Nuevo', 'Clear / New', 'Limpar / Novo'),
             onPressed: () {
               resetToNewCalculation();
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Cálculo limpiado'),
-                  duration: Duration(seconds: 1),
+                SnackBar(
+                  content: Text(_tr('Cálculo limpiado', 'Calculation cleared', 'Cálculo limpo')),
+                  duration: const Duration(seconds: 1),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
@@ -972,25 +1144,26 @@ class CalculatorScreenState extends State<CalculatorScreen> {
           IconButton(
             key: const Key('btnSavedProjectsAppBar'),
             icon: const Icon(Icons.folder_special_outlined, size: 20),
-            tooltip: 'Saved Projects',
+            tooltip: _tr('Proyectos Guardados', 'Saved Projects', 'Projetos Salvos'),
             onPressed: _openSavedProjects,
           ),
           IconButton(
             key: const Key('btnExportPdfAppBar'),
             icon: const Icon(Icons.picture_as_pdf_outlined, size: 20),
-            tooltip: 'Export PDF / Sign Report',
+            tooltip: _tr('Exportar PDF / Firmar', 'Export PDF / Sign Report', 'Exportar PDF'),
             onPressed: _openReportPreview,
           ),
           IconButton(
             key: const Key('btnSaveProject'),
             icon: const Icon(Icons.bookmark_add_outlined, size: 20),
-            tooltip: 'Save Calculation',
+            tooltip: _tr('Guardar Cálculo', 'Save Calculation', 'Salvar Cálculo'),
             onPressed: _showSaveCalculationDialog,
           ),
           IconButton(
             key: const Key('btnSettingsAppBar'),
             icon: const Icon(Icons.tune_rounded, size: 20),
-            tooltip: 'Ajustes / Perfil Técnico',
+            tooltip: _tr('Ajustes / Perfil Normativo', 'Settings / Normative Profile',
+                'Ajustes / Perfil'),
             onPressed: () async {
               if (widget.onOpenSettingsTab != null) {
                 widget.onOpenSettingsTab!();
@@ -1011,6 +1184,52 @@ class CalculatorScreenState extends State<CalculatorScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Compact Normative Country & Unit Banner
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: InkWell(
+                  key: const Key('btnCalculatorProfileBanner'),
+                  onTap: _toggleCountryQuickly,
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceElevated,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: AppTheme.accent.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Text(country.flagEmoji, style: const TextStyle(fontSize: 15)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '${country.codeBadge}  •  ${isMetric ? _tr("Métrico (DN / mm² / m)", "Metric (DN / mm² / m)", "Métrico") : _tr("Imperial (in / ft)", "Imperial (in / ft)", "Imperial")}',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _tr('Cambiar ⇄', 'Switch ⇄', 'Trocar ⇄'),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
               // Sticky Top Cross-Section Vector Visualizer
               RacewayVisualizer(
                 conduitRadiusInches: raceway.internalDiameterInches / 2.0,
@@ -1040,7 +1259,11 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                     ),
                     icon: const Icon(Icons.bolt, size: 20),
                     label: Text(
-                      '⚡ Overfilled! Tap to Upsize to ${fill.recommendedUpsizeTradeSize}" ${raceway.type.displayName}',
+                      _tr(
+                        '⚡ ¡Excedido! Tocar para subir a $upsizeSizeLabel ${raceway.type.displayName}',
+                        '⚡ Overfilled! Tap to Upsize to $upsizeSizeLabel ${raceway.type.displayName}',
+                        '⚡ Excedido! Subir para $upsizeSizeLabel ${raceway.type.displayName}',
+                      ),
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                     ),
                     onPressed: _upsizeRaceway,
@@ -1052,9 +1275,12 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Quick Presets',
-                      style: TextStyle(
+                    Text(
+                      isMexico
+                          ? _tr('Plantillas Rápidas NOM-001', 'NOM-001 Quick Presets',
+                              'Modelos Rápidos NOM')
+                          : _tr('Plantillas Rápidas NEC', 'Quick Presets', 'Modelos Rápidos'),
+                      style: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -1077,27 +1303,49 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: [
-                      ActionChip(
-                        label: const Text('3x #10 + 1x #12 Grd'),
-                        onPressed: () => _applyPreset('preset_3x10_1x12'),
-                      ),
-                      const SizedBox(width: 6),
-                      ActionChip(
-                        label: const Text('3x 500k + 1x #3 Grd'),
-                        onPressed: () => _applyPreset('preset_3x500_1x3'),
-                      ),
-                      const SizedBox(width: 6),
-                      ActionChip(
-                        label: const Text('4x #12 Branch'),
-                        onPressed: () => _applyPreset('preset_4x12_branch'),
-                      ),
-                      const SizedBox(width: 6),
-                      ActionChip(
-                        label: const Text('3x 4/0 Service'),
-                        onPressed: () => _applyPreset('preset_3x40_service'),
-                      ),
-                    ],
+                    children: isMexico
+                        ? [
+                            ActionChip(
+                              label: const Text('3x #12 Monofásico 127V'),
+                              onPressed: () => _applyPreset('preset_mx_mono_127'),
+                            ),
+                            const SizedBox(width: 6),
+                            ActionChip(
+                              label: const Text('3x #10 Bifásico 220V'),
+                              onPressed: () => _applyPreset('preset_mx_bif_220'),
+                            ),
+                            const SizedBox(width: 6),
+                            ActionChip(
+                              label: const Text('3x #8 + #10 Trifásico'),
+                              onPressed: () => _applyPreset('preset_mx_tri_220'),
+                            ),
+                            const SizedBox(width: 6),
+                            ActionChip(
+                              label: const Text('3x 250k + #4 Alim. 440V'),
+                              onPressed: () => _applyPreset('preset_mx_alim_440'),
+                            ),
+                          ]
+                        : [
+                            ActionChip(
+                              label: const Text('3x #10 + 1x #12 Grd'),
+                              onPressed: () => _applyPreset('preset_3x10_1x12'),
+                            ),
+                            const SizedBox(width: 6),
+                            ActionChip(
+                              label: const Text('3x 500k + 1x #3 Grd'),
+                              onPressed: () => _applyPreset('preset_3x500_1x3'),
+                            ),
+                            const SizedBox(width: 6),
+                            ActionChip(
+                              label: const Text('4x #12 Branch'),
+                              onPressed: () => _applyPreset('preset_4x12_branch'),
+                            ),
+                            const SizedBox(width: 6),
+                            ActionChip(
+                              label: const Text('3x 4/0 Service'),
+                              onPressed: () => _applyPreset('preset_3x40_service'),
+                            ),
+                          ],
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -1234,7 +1482,9 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                   key: const Key('btnToggleQuickPresets'),
                   avatar: const Icon(Icons.auto_awesome_rounded, size: 16, color: AppTheme.accent),
                   label: Text(
-                    _tr('+ Plantillas Rápidas NEC', '+ Quick Presets', '+ Modelos Rápidos'),
+                    StorageService.instance.isMexicoProfile
+                        ? _tr('+ Plantillas NOM-001', '+ Quick Presets', '+ Modelos NOM')
+                        : _tr('+ Plantillas Rápidas NEC', '+ Quick Presets', '+ Modelos Rápidos'),
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -1269,7 +1519,9 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                 key: const Key('btnOpenGroundingCalc'),
                 avatar: const Icon(Icons.shield_outlined, size: 16, color: AppColors.compliant),
                 label: Text(
-                  _tr('Tierra NEC 250', 'Grounding NEC 250', 'Aterramento 250'),
+                  StorageService.instance.isMexicoProfile
+                      ? _tr('Tierra NOM 250', 'Grounding NOM 250', 'Aterramento 250')
+                      : _tr('Tierra NEC 250', 'Grounding NEC 250', 'Aterramento 250'),
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -1320,22 +1572,33 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                 ),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Export PDF / Sign Report',
-                      style: TextStyle(
+                      _tr('Exportar PDF / Firmar Dictamen', 'Export PDF / Sign Report',
+                          'Exportar PDF / Assinar'),
+                      style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
-                      'Generate inspection-ready A4 compliance memorandum with touch signature',
-                      style: TextStyle(
+                      StorageService.instance.isMexicoProfile
+                          ? _tr(
+                              'Generar memoria técnica NOM-001 A4 lista para verificación con firma táctil',
+                              'Generate inspection-ready A4 compliance memorandum with touch signature',
+                              'Gerar relatório técnico A4 com assinatura digital',
+                            )
+                          : _tr(
+                              'Generar memoria de cumplimiento NEC A4 con firma táctil',
+                              'Generate inspection-ready A4 compliance memorandum with touch signature',
+                              'Gerar relatório técnico A4 com assinatura digital',
+                            ),
+                      style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.textSecondary,
                       ),
@@ -1383,22 +1646,27 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                 ),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Save Calculation to Projects',
-                      style: TextStyle(
+                      _tr('Guardar Cálculo en Proyectos', 'Save Calculation to Projects',
+                          'Salvar Cálculo em Projetos'),
+                      style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
-                      'Store raceway schedule, conductors & parameters locally',
-                      style: TextStyle(
+                      _tr(
+                        'Almacena tubería, conductores y parámetros localmente',
+                        'Store raceway schedule, conductors & parameters locally',
+                        'Armazena eletroduto, condutores e parâmetros localmente',
+                      ),
+                      style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.textSecondary,
                       ),
@@ -1419,6 +1687,7 @@ class CalculatorScreenState extends State<CalculatorScreen> {
   }
 
   Widget _buildRacewaySelectorCard(RacewayProfile raceway) {
+    final isMetric = StorageService.instance.isMetric;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -1428,11 +1697,12 @@ class CalculatorScreenState extends State<CalculatorScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Raceway Specification',
+                    _tr('Especificación de Canalización', 'Raceway Specification',
+                        'Especificação do Eletroduto'),
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
@@ -1440,11 +1710,13 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Nipple <= 24" toggle
+                // Nipple <= 24" (60 cm) toggle
                 Row(
                   children: [
-                    const Text('Nipple ≤ 24"',
-                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                    Text(
+                      isMetric ? 'Niple ≤ 60 cm' : 'Nipple ≤ 24"',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    ),
                     Switch(
                       value: _isNipple,
                       activeThumbColor: AppColors.compliant,
@@ -1463,7 +1735,9 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                   child: DropdownButtonFormField<RacewayType>(
                     isExpanded: true,
                     initialValue: _selectedRacewayType,
-                    decoration: const InputDecoration(labelText: 'Raceway Family'),
+                    decoration: InputDecoration(
+                      labelText: _tr('Tipo de Tubería', 'Raceway Family', 'Tipo de Tubo'),
+                    ),
                     dropdownColor: AppColors.surfaceCardHover,
                     items: RacewayType.values.map((type) {
                       return DropdownMenuItem(
@@ -1483,12 +1757,23 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                   child: DropdownButtonFormField<String>(
                     isExpanded: true,
                     initialValue: _selectedTradeSize,
-                    decoration: const InputDecoration(labelText: 'Trade Size'),
+                    decoration: InputDecoration(
+                      labelText: isMetric
+                          ? _tr('Diámetro Nominal', 'Trade Size (DN)', 'Diâmetro')
+                          : _tr('Diámetro (")', 'Trade Size', 'Bitola'),
+                    ),
                     dropdownColor: AppColors.surfaceCardHover,
                     items: RacewayCatalog.standardTradeSizes.map((size) {
                       return DropdownMenuItem(
                         value: size,
-                        child: Text('$size"', overflow: TextOverflow.ellipsis),
+                        child: Text(
+                          NormativeFormatters.formatRacewaySize(
+                            size,
+                            type: _selectedRacewayType,
+                            isMetric: isMetric,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       );
                     }).toList(),
                     onChanged: (val) {
@@ -1505,6 +1790,10 @@ class CalculatorScreenState extends State<CalculatorScreen> {
   }
 
   Widget _buildConductorScheduleCard() {
+    final storage = StorageService.instance;
+    final isMetric = storage.isMetric;
+    final isMexico = storage.isMexicoProfile;
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -1514,11 +1803,11 @@ class CalculatorScreenState extends State<CalculatorScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Conductor Schedule',
+                    _tr('Lista de Conductores', 'Conductor Schedule', 'Lista de Condutores'),
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
@@ -1532,7 +1821,10 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   ),
                   icon: const Icon(Icons.add_circle_outline, size: 16),
-                  label: const Text('Add Conductor', style: TextStyle(fontSize: 12)),
+                  label: Text(
+                    _tr('Agregar', 'Add Conductor', 'Adicionar'),
+                    style: const TextStyle(fontSize: 12),
+                  ),
                   onPressed: _openAddConductorDialog,
                 ),
               ],
@@ -1543,10 +1835,14 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 child: Column(
                   children: [
-                    const Center(
+                    Center(
                       child: Text(
-                        'No conductors added. Tap "Add Conductor" or select a preset.',
-                        style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                        _tr(
+                          'Sin conductores agregados. Toca "Agregar" o elige una plantilla.',
+                          'No conductors added. Tap "Add Conductor" or select a preset.',
+                          'Nenhum condutor adicionado. Toque em "Adicionar".',
+                        ),
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                         textAlign: TextAlign.center,
                       ),
                     ),
@@ -1557,11 +1853,17 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                         icon: const Icon(Icons.auto_awesome_rounded,
                             size: 16, color: AppTheme.accent),
                         label: Text(
-                          _tr(
-                            'Ver Plantillas Rápidas NEC',
-                            'Show Quick NEC Presets',
-                            'Ver Modelos Rápidos NEC',
-                          ),
+                          isMexico
+                              ? _tr(
+                                  'Ver Plantillas NOM-001',
+                                  'Show Quick NOM-001 Presets',
+                                  'Ver Modelos NOM',
+                                )
+                              : _tr(
+                                  'Ver Plantillas Rápidas NEC',
+                                  'Show Quick NEC Presets',
+                                  'Ver Modelos Rápidos NEC',
+                                ),
                           style: const TextStyle(color: AppTheme.accent, fontSize: 12),
                         ),
                       ),
@@ -1579,6 +1881,10 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                 itemBuilder: (context, index) {
                   final group = _conductorGroups[index];
                   final color = AppColors.getConductorColor(group.role);
+                  final metricsLine = isMetric
+                      ? '${_tr("Área", "Area", "Área")}: ${(group.totalAreaSqInches * NormativeFormatters.sqInchesToSqMm).toStringAsFixed(1)} mm² | Ø: ${(group.spec.outerDiameterInches * NormativeFormatters.inchesToMm).toStringAsFixed(2)} mm'
+                      : 'Area: ${group.totalAreaSqInches.toStringAsFixed(4)} sq in | OD: ${group.spec.outerDiameterInches.toStringAsFixed(3)}"';
+
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     child: Row(
@@ -1601,7 +1907,7 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                                 ),
                               ),
                               Text(
-                                'Area: ${group.totalAreaSqInches.toStringAsFixed(4)} sq in | OD: ${group.spec.outerDiameterInches.toStringAsFixed(3)}"',
+                                metricsLine,
                                 style: const TextStyle(
                                   fontSize: 11,
                                   color: AppColors.textTertiary,
@@ -1655,22 +1961,32 @@ class CalculatorScreenState extends State<CalculatorScreen> {
   }
 
   Widget _buildVoltageDropCard(VoltageDropResult vDrop) {
+    final storage = StorageService.instance;
+    final isMetric = storage.isMetric;
+    final country = storage.normativeCountry;
+
     final statusColor = vDrop.complianceStatus == VoltageDropComplianceStatus.pass
         ? AppColors.compliant
         : (vDrop.complianceStatus == VoltageDropComplianceStatus.caution
             ? AppColors.caution
             : AppColors.overfilled);
 
+    final double lengthMeters =
+        (_circuitLengthFeet * NormativeFormatters.feetToMeters).clamp(3.0, 300.0);
+    final String lengthText = isMetric
+        ? '${_tr("Longitud del Circuito", "Circuit Length", "Comprimento")}: ${lengthMeters.toStringAsFixed(0)} m (${_circuitLengthFeet.toStringAsFixed(0)} ft)'
+        : '${_tr("Longitud del Circuito", "Circuit Length", "Comprimento")}: ${_circuitLengthFeet.toStringAsFixed(0)} ft';
+
     return Card(
       child: ExpansionTile(
         initiallyExpanded: true,
         title: Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
-                'Live Voltage Drop',
+                _tr('Caída de Tensión en Vivo', 'Live Voltage Drop', 'Queda de Tensão'),
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: const TextStyle(
                     fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
               ),
             ),
@@ -1709,9 +2025,15 @@ class CalculatorScreenState extends State<CalculatorScreen> {
             children: [
               Expanded(
                 child: SegmentedButton<CircuitPhase>(
-                  segments: const [
-                    ButtonSegment(value: CircuitPhase.singlePhase, label: Text('1-Phase')),
-                    ButtonSegment(value: CircuitPhase.threePhase, label: Text('3-Phase')),
+                  segments: [
+                    ButtonSegment(
+                      value: CircuitPhase.singlePhase,
+                      label: Text(_tr('1-Fase', '1-Phase', '1-Fase')),
+                    ),
+                    ButtonSegment(
+                      value: CircuitPhase.threePhase,
+                      label: Text(_tr('3-Fases', '3-Phase', '3-Fases')),
+                    ),
                   ],
                   selected: {_circuitPhase},
                   onSelectionChanged: (set) {
@@ -1723,12 +2045,12 @@ class CalculatorScreenState extends State<CalculatorScreen> {
               DropdownButton<double>(
                 value: _nominalVoltage,
                 dropdownColor: AppColors.surfaceCardHover,
-                items: const [
-                  DropdownMenuItem(value: 120.0, child: Text('120 V')),
-                  DropdownMenuItem(value: 208.0, child: Text('208 V')),
-                  DropdownMenuItem(value: 240.0, child: Text('240 V')),
-                  DropdownMenuItem(value: 480.0, child: Text('480 V')),
-                ],
+                items: NormativeCountryExtension.allSupportedVoltages.map((v) {
+                  return DropdownMenuItem(
+                    value: v,
+                    child: Text('${v.toStringAsFixed(0)} V'),
+                  );
+                }).toList(),
                 onChanged: (val) {
                   if (val != null) setState(() => _nominalVoltage = val);
                 },
@@ -1743,7 +2065,7 @@ class CalculatorScreenState extends State<CalculatorScreen> {
             children: [
               Expanded(
                 child: Text(
-                  'Circuit Length: ${_circuitLengthFeet.toStringAsFixed(0)} ft',
+                  lengthText,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
@@ -1752,7 +2074,7 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                 child: Padding(
                   padding: const EdgeInsets.only(left: 8.0),
                   child: Text(
-                    'Drop: ${vDrop.voltageDropVolts.toStringAsFixed(2)} V',
+                    '${_tr("Caída", "Drop", "Queda")}: ${vDrop.voltageDropVolts.toStringAsFixed(2)} V',
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: statusColor),
@@ -1762,12 +2084,15 @@ class CalculatorScreenState extends State<CalculatorScreen> {
             ],
           ),
           Slider(
-            value: _circuitLengthFeet.clamp(10.0, 1000.0),
-            min: 10.0,
-            max: 1000.0,
+            value: isMetric ? lengthMeters : _circuitLengthFeet.clamp(10.0, 1000.0),
+            min: isMetric ? 3.0 : 10.0,
+            max: isMetric ? 300.0 : 1000.0,
             divisions: 99,
             activeColor: AppColors.compliant,
-            onChanged: (val) => setState(() => _circuitLengthFeet = val),
+            onChanged: (val) => setState(() {
+              _circuitLengthFeet =
+                  isMetric ? val / NormativeFormatters.feetToMeters : val;
+            }),
           ),
 
           // Load Current Slider
@@ -1776,7 +2101,7 @@ class CalculatorScreenState extends State<CalculatorScreen> {
             children: [
               Expanded(
                 child: Text(
-                  'Load Current: ${_loadCurrentAmps.toStringAsFixed(0)} A',
+                  '${_tr("Corriente de Carga", "Load Current", "Corrente")}: ${_loadCurrentAmps.toStringAsFixed(0)} A',
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
@@ -1785,7 +2110,7 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                 child: Padding(
                   padding: const EdgeInsets.only(left: 8.0),
                   child: Text(
-                    'End Voltage: ${vDrop.endVoltage.toStringAsFixed(1)} V',
+                    '${_tr("Tensión Final", "End Voltage", "Tensão Final")}: ${vDrop.endVoltage.toStringAsFixed(1)} V',
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
                     style: const TextStyle(fontSize: 12, color: AppColors.textPrimary),
@@ -1809,19 +2134,19 @@ class CalculatorScreenState extends State<CalculatorScreen> {
             children: [
               Expanded(
                 child: Text(
-                  'Power Factor: ${_powerFactor.toStringAsFixed(2)}',
+                  '${_tr("Factor de Potencia", "Power Factor", "Fator de Potência")}: ${_powerFactor.toStringAsFixed(2)}',
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
               ),
-              const Flexible(
+              Flexible(
                 child: Padding(
-                  padding: EdgeInsets.only(left: 8.0),
+                  padding: const EdgeInsets.only(left: 8.0),
                   child: Text(
-                    'Branch Limit: 3% | Total: 5%',
+                    '${country.shortCode}: ${_tr("Derivado 3% | Total 5%", "Branch 3% | Total 5%", "3% | 5%")}',
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
-                    style: TextStyle(fontSize: 11, color: AppColors.textTertiary),
+                    style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
                   ),
                 ),
               ),
@@ -1841,16 +2166,20 @@ class CalculatorScreenState extends State<CalculatorScreen> {
   }
 
   Widget _buildDeratingCard(DeratingResult derate) {
+    final storage = StorageService.instance;
+    final country = storage.normativeCountry;
+    final isMetric = storage.isMetric;
+
     return Card(
       child: ExpansionTile(
         initiallyExpanded: true,
         title: Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
-                'Live Thermal Derating',
+                _tr('Ajuste Térmico y Ampacidad', 'Live Thermal Derating', 'Fator Térmico'),
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: const TextStyle(
                     fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
               ),
             ),
@@ -1864,7 +2193,7 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                   border: Border.all(color: AppColors.compliant),
                 ),
                 child: Text(
-                  '${derate.allowableAmpacity.toStringAsFixed(1)} A Allowable',
+                  '${derate.allowableAmpacity.toStringAsFixed(1)} A ${_tr("Perm.", "Allowable", "Adm.")}',
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                       color: AppColors.compliant, fontSize: 10, fontWeight: FontWeight.bold),
@@ -1891,7 +2220,9 @@ class CalculatorScreenState extends State<CalculatorScreen> {
             children: [
               Expanded(
                 child: Text(
-                  'Ambient Temp: ${_ambientTempC.toStringAsFixed(0)}°C (${(_ambientTempC * 1.8 + 32).toStringAsFixed(0)}°F)',
+                  isMetric
+                      ? '${_tr("Temp. Ambiente", "Ambient Temp", "Temp. Ambiente")}: ${_ambientTempC.toStringAsFixed(0)}°C'
+                      : '${_tr("Temp. Ambiente", "Ambient Temp", "Temp. Ambiente")}: ${_ambientTempC.toStringAsFixed(0)}°C (${(_ambientTempC * 1.8 + 32).toStringAsFixed(0)}°F)',
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
@@ -1900,7 +2231,7 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                 child: Padding(
                   padding: const EdgeInsets.only(left: 8.0),
                   child: Text(
-                    'Temp Factor: ${derate.temperatureCorrectionFactor.toStringAsFixed(2)}',
+                    '${_tr("Factor Temp.", "Temp Factor", "Fator Temp.")}: ${derate.temperatureCorrectionFactor.toStringAsFixed(2)}',
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
                     style: const TextStyle(
@@ -1925,7 +2256,7 @@ class CalculatorScreenState extends State<CalculatorScreen> {
             children: [
               Expanded(
                 child: Text(
-                  'CCC Count: $_calculatedCccCount',
+                  '${_tr("Cond. Activos (CCC)", "CCC Count", "Cond. Ativos")}: $_calculatedCccCount',
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
@@ -1934,7 +2265,7 @@ class CalculatorScreenState extends State<CalculatorScreen> {
                 child: Padding(
                   padding: const EdgeInsets.only(left: 8.0),
                   child: Text(
-                    'Bundling Factor: ${derate.bundlingAdjustmentFactor.toStringAsFixed(2)}',
+                    '${_tr("Factor Agrupamiento", "Bundling Factor", "Fator Agrupamento")}: ${derate.bundlingAdjustmentFactor.toStringAsFixed(2)}',
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.end,
                     style: const TextStyle(
@@ -1950,11 +2281,11 @@ class CalculatorScreenState extends State<CalculatorScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
-                  'Terminal Rating (NEC 110.14(C)):',
+                  '${_tr("Límite Terminales", "Terminal Rating", "Limite Terminais")} (${country.terminalRatingRef}):',
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                 ),
               ),
               const SizedBox(width: 8),
@@ -1981,20 +2312,25 @@ class CalculatorScreenState extends State<CalculatorScreen> {
             child: Column(
               children: [
                 _buildAmpacityRow(
-                    'Base Ampacity (${_primaryConductorSpec.insulation.name.toUpperCase()} 90°C):',
+                    '${_tr("Ampacidad Base", "Base Ampacity", "Ampacidade Base")} (${_primaryConductorSpec.insulation.name.toUpperCase()} 90°C):',
                     '${derate.baseAmpacity.toStringAsFixed(1)} A'),
-                _buildAmpacityRow('Derated Ampacity (Base × CF × AF):',
+                _buildAmpacityRow(
+                    _tr('Ampacidad Ajustada (Base × FT × FA):',
+                        'Derated Ampacity (Base × CF × AF):', 'Ampacidade Ajustada:'),
                     '${derate.deratedAmpacity.toStringAsFixed(1)} A'),
                 _buildAmpacityRow(
-                    'Terminal Limit (${_terminalRatingC.toStringAsFixed(0)}°C NEC 110.14(C)):',
+                    '${_tr("Límite Terminal", "Terminal Limit", "Limite Terminal")} (${_terminalRatingC.toStringAsFixed(0)}°C ${country.terminalRatingRef}):',
                     '${derate.terminalRatingLimit.toStringAsFixed(1)} A'),
                 const Divider(color: AppColors.borderSubtle, height: 8),
-                _buildAmpacityRow('Final Allowable Ampacity:',
+                _buildAmpacityRow(
+                    _tr('Ampacidad Final Permisible (${country.shortCode}):',
+                        'Final Allowable Ampacity:', 'Ampacidade Final:'),
                     '${derate.allowableAmpacity.toStringAsFixed(1)} A',
                     isBold: true),
                 if (derate.smallWireOcpdLimit != null)
-                  _buildAmpacityRow('Small Conductor OCPD Limit (NEC 240.4(D)):',
-                      '${derate.smallWireOcpdLimit} A Max'),
+                  _buildAmpacityRow(
+                      '${_tr("Límite OCPD Calibres Menores", "Small Conductor OCPD Limit", "Limite OCPD")} (${country.smallOcpdRef}):',
+                      '${derate.smallWireOcpdLimit} A ${_tr("Máx", "Max", "Máx")}'),
               ],
             ),
           ),

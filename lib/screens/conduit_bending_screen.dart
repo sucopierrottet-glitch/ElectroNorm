@@ -13,8 +13,9 @@ class ConduitBendingScreen extends StatefulWidget {
 class _ConduitBendingScreenState extends State<ConduitBendingScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late bool _useMetric;
 
-  // 1. Offsets
+  // 1. Offsets (stored internally in inches)
   double _offsetHeight = 4.0;
   BendAngle _offsetAngle = BendAngle.deg30;
   final TextEditingController _offsetHeightCtrl =
@@ -53,10 +54,78 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _useMetric = StorageService.instance.isMetric;
+    _syncControllersToUnit();
+    StorageService.instance.addListener(_onStorageChanged);
+  }
+
+  void _onStorageChanged() {
+    if (!mounted) return;
+    final metric = StorageService.instance.isMetric;
+    if (metric != _useMetric) {
+      setState(() {
+        _useMetric = metric;
+        _syncControllersToUnit();
+      });
+    } else {
+      setState(() {});
+    }
+  }
+
+  void _syncControllersToUnit() {
+    String fmt(double inches) {
+      final v = _useMetric ? inches * NormativeFormatters.inchesToCm : inches;
+      return v.toStringAsFixed(1);
+    }
+
+    _offsetHeightCtrl.text = fmt(_offsetHeight);
+    _stubHeightCtrl.text = fmt(_stubHeight);
+    _saddle3HeightCtrl.text = fmt(_saddle3Height);
+    _saddle4HeightCtrl.text = fmt(_saddle4Height);
+    _saddle4WidthCtrl.text = fmt(_saddle4Width);
+  }
+
+  void _toggleUnit() {
+    final nextMetric = !_useMetric;
+    setState(() {
+      _useMetric = nextMetric;
+      _syncControllersToUnit();
+    });
+    StorageService.instance.setUnitSystem(
+      nextMetric ? MeasurementUnitSystem.metric : MeasurementUnitSystem.imperial,
+    );
+  }
+
+  double? _parseLengthToInches(String raw) {
+    final d = double.tryParse(raw.replaceAll(',', '.'));
+    if (d == null || d <= 0) return null;
+    return _useMetric ? d / NormativeFormatters.inchesToCm : d;
+  }
+
+  String _primaryResult(double inches, String fractionIn) {
+    if (_useMetric) {
+      return '${(inches * NormativeFormatters.inchesToCm).toStringAsFixed(1)} cm';
+    }
+    return fractionIn;
+  }
+
+  String _secondaryResult(double inches, String fractionIn) {
+    if (_useMetric) {
+      return '($fractionIn / ${inches.toStringAsFixed(2)}")';
+    }
+    return '(${inches.toStringAsFixed(2)}")';
+  }
+
+  String _formatDim(double inches) {
+    if (_useMetric) {
+      return '${(inches * NormativeFormatters.inchesToCm).toStringAsFixed(1)} cm';
+    }
+    return '${inches.toStringAsFixed(1)}"';
   }
 
   @override
   void dispose() {
+    StorageService.instance.removeListener(_onStorageChanged);
     _tabController.dispose();
     _offsetHeightCtrl.dispose();
     _stubHeightCtrl.dispose();
@@ -77,6 +146,33 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
         ),
         backgroundColor: AppColors.surfaceElevated,
         elevation: 0,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: TextButton.icon(
+              key: const Key('btnToggleBendingUnit'),
+              onPressed: _toggleUnit,
+              icon: const Icon(Icons.straighten_rounded,
+                  size: 16, color: AppTheme.accent),
+              label: Text(
+                _useMetric ? 'cm / DN' : 'in / "',
+                style: const TextStyle(
+                  color: AppTheme.accent,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+              style: TextButton.styleFrom(
+                backgroundColor: AppTheme.accent.withValues(alpha: 0.12),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  side: BorderSide(color: AppTheme.accent.withValues(alpha: 0.4)),
+                ),
+              ),
+            ),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           isScrollable: true,
@@ -123,6 +219,19 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
       offsetHeight: _offsetHeight,
       angle: _offsetAngle,
     );
+    final unitSuffix = _useMetric ? 'cm' : 'in (")';
+    final unitName = _useMetric
+        ? _tr('centímetros', 'cm', 'centímetros')
+        : _tr('pulgadas', 'inches', 'polegadas');
+    final shrinkPerUnit = _useMetric
+        ? '${(result.angle.shrinkPerInch * NormativeFormatters.inchesToCm).toStringAsFixed(2)} cm / 1 cm'
+        : _tr('${result.angle.shrinkFraction} por cada pulgada de salto',
+            '${result.angle.shrinkFraction} per inch of offset', '');
+
+    final distDisplay =
+        _useMetric ? '${(result.distanceBetweenMarks * NormativeFormatters.inchesToCm).toStringAsFixed(1)} cm' : result.distanceFraction;
+    final shrinkDisplay =
+        _useMetric ? '${(result.totalShrink * NormativeFormatters.inchesToCm).toStringAsFixed(1)} cm' : result.shrinkFraction;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -138,17 +247,17 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
                   controller: _offsetHeightCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
-                    labelText: _tr('Altura del obstáculo / Salto (pulgadas)',
-                        'Obstacle / Offset Height (inches)', 'Altura do obstáculo (polegadas)'),
-                    suffixText: 'in (")',
+                    labelText: _tr('Altura del obstáculo / Salto ($unitName)',
+                        'Obstacle / Offset Height ($unitName)', 'Altura do obstáculo ($unitName)'),
+                    suffixText: unitSuffix,
                     filled: true,
                     fillColor: AppColors.surfaceCard,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   onChanged: (val) {
-                    final d = double.tryParse(val.replaceAll(',', '.'));
-                    if (d != null && d > 0) {
-                      setState(() => _offsetHeight = d);
+                    final inches = _parseLengthToInches(val);
+                    if (inches != null) {
+                      setState(() => _offsetHeight = inches);
                     }
                   },
                 ),
@@ -187,22 +296,21 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
             children: [
               _buildResultRow(
                 _tr('Distancia entre marcas:', 'Distance between marks:', 'Distância entre marcas:'),
-                result.distanceFraction,
-                '(${result.distanceBetweenMarks.toStringAsFixed(2)}")',
+                _primaryResult(result.distanceBetweenMarks, result.distanceFraction),
+                _secondaryResult(result.distanceBetweenMarks, result.distanceFraction),
                 isHighlight: true,
               ),
               const Divider(color: Colors.white24, height: 16),
               _buildResultRow(
                 _tr('Acortamiento total (Shrink):', 'Total conduit shrink:', 'Encurtamento total:'),
-                result.shrinkFraction,
-                '(${result.totalShrink.toStringAsFixed(2)}")',
+                _primaryResult(result.totalShrink, result.shrinkFraction),
+                _secondaryResult(result.totalShrink, result.shrinkFraction),
               ),
               const Divider(color: Colors.white24, height: 16),
               _buildResultRow(
                 _tr('Multiplicador aplicado:', 'Applied multiplier:', 'Multiplicador aplicado:'),
                 '${result.angle.multiplier}x',
-                _tr('${result.angle.shrinkFraction} por cada pulgada de salto',
-                    '${result.angle.shrinkFraction} per inch of offset', ''),
+                shrinkPerUnit,
               ),
             ],
           ),
@@ -211,17 +319,17 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
             _tr(
               'Instrucciones de Marcado:\n'
               '1. Haz la Marca 1 en el punto donde debe iniciar el desvío.\n'
-              '2. Mide exactamente ${result.distanceFraction} y haz la Marca 2.\n'
+              '2. Mide exactamente $distDisplay y haz la Marca 2.\n'
               '3. Alinea la flecha de la dobladora con la Marca 1 y dobla a ${_offsetAngle.degrees.toStringAsFixed(0)}°.\n'
               '4. Gira el tubo 180°, alinea con la Marca 2 y realiza la segunda curva a ${_offsetAngle.degrees.toStringAsFixed(0)}°.\n'
-              '5. Agrega ${result.shrinkFraction} a tu longitud total de tubo para compensar el acortamiento.',
+              '5. Agrega $shrinkDisplay a tu longitud total de tubo para compensar el acortamiento.',
               'Marking Instructions:\n'
               '1. Place Mark 1 at the point where the bend should start.\n'
-              '2. Measure exactly ${result.distanceFraction} and place Mark 2.\n'
+              '2. Measure exactly $distDisplay and place Mark 2.\n'
               '3. Align the bender arrow with Mark 1 and bend to ${_offsetAngle.degrees.toStringAsFixed(0)}°.\n'
               '4. Rotate the conduit 180°, align with Mark 2, and bend to ${_offsetAngle.degrees.toStringAsFixed(0)}°.\n'
-              '5. Add ${result.shrinkFraction} to your overall conduit cut length to compensate for shrink.',
-              'Instruções de Marcação:\n1. Faça a Marca 1 onde o desvio deve começar.\n2. Meça ${result.distanceFraction} e faça a Marca 2.\n3. Dobre cada uma a ${_offsetAngle.degrees.toStringAsFixed(0)}° girando 180° entre curvas.',
+              '5. Add $shrinkDisplay to your overall conduit cut length to compensate for shrink.',
+              'Instruções de Marcação:\n1. Faça a Marca 1 onde o desvio deve começar.\n2. Meça $distDisplay e faça a Marca 2.\n3. Dobre cada uma a ${_offsetAngle.degrees.toStringAsFixed(0)}° girando 180° entre curvas.',
             ),
           ),
         ],
@@ -236,6 +344,17 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
       conduitType: _stubConduitType,
       tradeSize: _stubTradeSize,
     );
+    final unitSuffix = _useMetric ? 'cm' : 'in (")';
+    final unitName = _useMetric
+        ? _tr('centímetros', 'cm', 'centímetros')
+        : _tr('pulgadas', 'inches', 'polegadas');
+    final sizeLabel =
+        NormativeFormatters.formatRacewaySize(_stubTradeSize, isMetric: _useMetric);
+    final arrowDisplay = _primaryResult(result.distanceToArrow, result.distanceToArrowFraction);
+    final desiredDisplay = _formatDim(result.desiredStubHeight);
+    final takeUpDisplay = _useMetric
+        ? '${(result.takeUpDeduction * NormativeFormatters.inchesToCm).toStringAsFixed(1)} cm (${result.takeUpDeduction.toStringAsFixed(1)}")'
+        : '${result.takeUpDeduction.toStringAsFixed(1)}"';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -252,17 +371,17 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
                   controller: _stubHeightCtrl,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: InputDecoration(
-                    labelText: _tr('Altura deseada del Stub (pulgadas)',
-                        'Desired Stub Height (inches)', 'Altura desejada do Stub (polegadas)'),
-                    suffixText: 'in (")',
+                    labelText: _tr('Altura deseada del Stub ($unitName)',
+                        'Desired Stub Height ($unitName)', 'Altura desejada do Stub ($unitName)'),
+                    suffixText: unitSuffix,
                     filled: true,
                     fillColor: AppColors.surfaceCard,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   onChanged: (val) {
-                    final d = double.tryParse(val.replaceAll(',', '.'));
-                    if (d != null && d > 0) {
-                      setState(() => _stubHeight = d);
+                    final inches = _parseLengthToInches(val);
+                    if (inches != null) {
+                      setState(() => _stubHeight = inches);
                     }
                   },
                 ),
@@ -300,7 +419,9 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
                         initialValue: _stubTradeSize,
                         isExpanded: true,
                         decoration: InputDecoration(
-                          labelText: _tr('Calibre / Tamaño', 'Trade Size', 'Bitola'),
+                          labelText: _useMetric
+                              ? _tr('Diámetro Nominal', 'Trade Size (DN)', 'Diâmetro')
+                              : _tr('Calibre / Tamaño', 'Trade Size', 'Bitola'),
                           filled: true,
                           fillColor: AppColors.surfaceCard,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
@@ -308,7 +429,11 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
                         items: ConduitBendingCalculator.supportedTradeSizes.map((s) {
                           return DropdownMenuItem(
                             value: s,
-                            child: Text('$s"', style: const TextStyle(fontWeight: FontWeight.bold)),
+                            child: Text(
+                              NormativeFormatters.formatRacewaySize(s, isMetric: _useMetric),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           );
                         }).toList(),
                         onChanged: (val) {
@@ -330,17 +455,17 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
               _buildResultRow(
                 _tr('Medir desde el extremo hasta la Flecha:',
                     'Measure from end to Arrow Mark:', 'Medir da extremidade até a flecha:'),
-                result.distanceToArrowFraction,
-                '(${result.distanceToArrow.toStringAsFixed(2)}")',
+                _primaryResult(result.distanceToArrow, result.distanceToArrowFraction),
+                _secondaryResult(result.distanceToArrow, result.distanceToArrowFraction),
                 isHighlight: true,
               ),
               const Divider(color: Colors.white24, height: 16),
               _buildResultRow(
                 _tr('Deducción del bender (Take-Up):', 'Bender Take-up deduction:',
                     'Dedução da dobradora (Take-Up):'),
-                '${result.takeUpDeduction.toStringAsFixed(1)}"',
-                _tr('Deducción estándar para $_stubTradeSize" ${_stubConduitType.displayName}',
-                    'Standard deduction for $_stubTradeSize" ${_stubConduitType.displayName}', ''),
+                takeUpDisplay,
+                _tr('Deducción estándar para $sizeLabel ${_stubConduitType.displayName}',
+                    'Standard deduction for $sizeLabel ${_stubConduitType.displayName}', ''),
               ),
             ],
           ),
@@ -348,18 +473,18 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
           _buildInstructionBox(
             _tr(
               'Fórmula Aplicada:\n'
-              'Distancia a la Flecha = Altura Deseada (${result.desiredStubHeight}") - Deducción (${result.takeUpDeduction}") = ${result.distanceToArrowFraction}.\n\n'
+              'Distancia a la Flecha = Altura Deseada ($desiredDisplay) - Deducción ($takeUpDisplay) = $arrowDisplay.\n\n'
               'Instrucciones de Doblado:\n'
-              '1. Mide ${result.distanceToArrowFraction} desde la punta del tubo hacia adentro y haz una marca.\n'
+              '1. Mide $arrowDisplay desde la punta del tubo hacia adentro y haz una marca.\n'
               '2. Inserta el tubo en la dobladora alineando la FLECHA (Arrow symbol) exactamente con la marca.\n'
               '3. Apoya el pie firmemente sobre el pedal y dobla con presión uniforme hasta que el nivel marque 90° exactos.',
               'Formula:\n'
-              'Distance to Arrow = Desired Height (${result.desiredStubHeight}") - Take-up (${result.takeUpDeduction}") = ${result.distanceToArrowFraction}.\n\n'
+              'Distance to Arrow = Desired Height ($desiredDisplay) - Take-up ($takeUpDisplay) = $arrowDisplay.\n\n'
               'Bending Steps:\n'
-              '1. Measure ${result.distanceToArrowFraction} from the end of the conduit and mark.\n'
+              '1. Measure $arrowDisplay from the end of the conduit and mark.\n'
               '2. Insert the conduit into the bender, aligning the ARROW exactly with your mark.\n'
               '3. Keep firm foot pressure on the pedal and pull smoothly until the bubble level reads 90°.',
-              'Instruções:\nMeça ${result.distanceToArrowFraction} da ponta do tubo até a marca da flecha do dobrador e faça a curva até 90° exatos.',
+              'Instruções:\nMeça $arrowDisplay da ponta do tubo até a marca da flecha do dobrador e faça a curva até 90° exatos.',
             ),
           ),
         ],
@@ -373,6 +498,11 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
       obstructionHeight: _saddle3Height,
       centerAngle: _saddle3CenterAngle,
     );
+    final unitSuffix = _useMetric ? 'cm' : 'in (")';
+    final distDisplay =
+        _primaryResult(result.distanceCenterToSide, result.distanceFraction);
+    final shrinkDisplay =
+        _primaryResult(result.totalShrink, result.shrinkFraction);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -391,15 +521,15 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
                   decoration: InputDecoration(
                     labelText: _tr('Altura del obstáculo a sobrepasar',
                         'Obstacle Height to clear', 'Altura do obstáculo'),
-                    suffixText: 'in (")',
+                    suffixText: unitSuffix,
                     filled: true,
                     fillColor: AppColors.surfaceCard,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   onChanged: (val) {
-                    final d = double.tryParse(val.replaceAll(',', '.'));
-                    if (d != null && d > 0) {
-                      setState(() => _saddle3Height = d);
+                    final inches = _parseLengthToInches(val);
+                    if (inches != null) {
+                      setState(() => _saddle3Height = inches);
                     }
                   },
                 ),
@@ -465,15 +595,15 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
               _buildResultRow(
                 _tr('Distancia del Centro a cada lado:', 'Distance from Center to each side bend:',
                     'Distância do Centro a cada lado:'),
-                result.distanceFraction,
-                '(${result.distanceCenterToSide.toStringAsFixed(2)}")',
+                distDisplay,
+                _secondaryResult(result.distanceCenterToSide, result.distanceFraction),
                 isHighlight: true,
               ),
               const Divider(color: Colors.white24, height: 16),
               _buildResultRow(
                 _tr('Acortamiento total (Shrink):', 'Total conduit shrink:', 'Encurtamento total:'),
-                result.shrinkFraction,
-                '(${result.totalShrink.toStringAsFixed(2)}")',
+                shrinkDisplay,
+                _secondaryResult(result.totalShrink, result.shrinkFraction),
               ),
             ],
           ),
@@ -481,16 +611,16 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
           _buildInstructionBox(
             _tr(
               'Instrucciones de Doblado 3-Bend Saddle:\n'
-              '1. Marca el centro exacto del obstáculo en el tubo. Desplaza la marca ${result.shrinkFraction} hacia adelante para compensar el shrink.\n'
-              '2. Desde esta nueva marca central, mide ${result.distanceFraction} hacia la izquierda y ${result.distanceFraction} hacia la derecha.\n'
+              '1. Marca el centro exacto del obstáculo en el tubo. Desplaza la marca $shrinkDisplay hacia adelante para compensar el shrink.\n'
+              '2. Desde esta nueva marca central, mide $distDisplay hacia la izquierda y $distDisplay hacia la derecha.\n'
               '3. Coloca la muesca de la dobladora (Notch) en la marca central y dobla a ${_saddle3CenterAngle.toStringAsFixed(0)}°.\n'
               '4. Gira el tubo 180°, alinea la flecha (Arrow) con las dos marcas exteriores y dobla cada una a ${result.sideAngle.toStringAsFixed(1)}°.',
               '3-Bend Saddle Steps:\n'
-              '1. Find the center of the obstruction and mark it on the conduit. Shift this mark forward by ${result.shrinkFraction} to compensate for shrink.\n'
-              '2. From the shifted center mark, measure ${result.distanceFraction} each way and make two outer marks.\n'
+              '1. Find the center of the obstruction and mark it on the conduit. Shift this mark forward by $shrinkDisplay to compensate for shrink.\n'
+              '2. From the shifted center mark, measure $distDisplay each way and make two outer marks.\n'
               '3. Place the bender RIM NOTCH on the center mark and bend to ${_saddle3CenterAngle.toStringAsFixed(0)}°.\n'
               '4. Reverse the bender, align the ARROW mark on each outer mark, and bend both to ${result.sideAngle.toStringAsFixed(1)}°.',
-              'Passos:\n1. Marque o centro e desloque ${result.shrinkFraction}.\n2. Marque ${result.distanceFraction} para cada lado.\n3. Dobre o centro a ${_saddle3CenterAngle.toStringAsFixed(0)}° e as laterais a ${result.sideAngle.toStringAsFixed(1)}° girando 180°.',
+              'Passos:\n1. Marque o centro e desloque $shrinkDisplay.\n2. Marque $distDisplay para cada lado.\n3. Dobre o centro a ${_saddle3CenterAngle.toStringAsFixed(0)}° e as laterais a ${result.sideAngle.toStringAsFixed(1)}° girando 180°.',
             ),
           ),
         ],
@@ -505,6 +635,12 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
       obstructionWidth: _saddle4Width,
       angle: _saddle4Angle,
     );
+    final unitSuffix = _useMetric ? 'cm' : 'in (")';
+    final pairDistDisplay = _primaryResult(
+        result.distanceBetweenOffsetMarks, result.distanceBetweenOffsetMarksFraction);
+    final spanDisplay = _formatDim(result.obstructionWidth);
+    final shrinkDisplay =
+        _primaryResult(result.totalShrink, result.totalShrinkFraction);
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -525,15 +661,15 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         decoration: InputDecoration(
                           labelText: _tr('Altura obstáculo', 'Obstacle Height', 'Altura'),
-                          suffixText: 'in (")',
+                          suffixText: unitSuffix,
                           filled: true,
                           fillColor: AppColors.surfaceCard,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                         onChanged: (val) {
-                          final d = double.tryParse(val.replaceAll(',', '.'));
-                          if (d != null && d > 0) {
-                            setState(() => _saddle4Height = d);
+                          final inches = _parseLengthToInches(val);
+                          if (inches != null) {
+                            setState(() => _saddle4Height = inches);
                           }
                         },
                       ),
@@ -545,15 +681,15 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
                         keyboardType: const TextInputType.numberWithOptions(decimal: true),
                         decoration: InputDecoration(
                           labelText: _tr('Ancho obstáculo', 'Obstacle Width', 'Largura'),
-                          suffixText: 'in (")',
+                          suffixText: unitSuffix,
                           filled: true,
                           fillColor: AppColors.surfaceCard,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                         ),
                         onChanged: (val) {
-                          final d = double.tryParse(val.replaceAll(',', '.'));
-                          if (d != null && d > 0) {
-                            setState(() => _saddle4Width = d);
+                          final inches = _parseLengthToInches(val);
+                          if (inches != null) {
+                            setState(() => _saddle4Width = inches);
                           }
                         },
                       ),
@@ -597,23 +733,24 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
               _buildResultRow(
                 _tr('Distancia entre cada par de marcas:', 'Distance between each offset pair:',
                     'Distância entre cada par:'),
-                result.distanceBetweenOffsetMarksFraction,
-                '(${result.distanceBetweenOffsetMarks.toStringAsFixed(2)}")',
+                pairDistDisplay,
+                _secondaryResult(result.distanceBetweenOffsetMarks,
+                    result.distanceBetweenOffsetMarksFraction),
                 isHighlight: true,
               ),
               const Divider(color: Colors.white24, height: 16),
               _buildResultRow(
                 _tr('Largo del puente horizontal:', 'Bridge / Top span length:',
                     'Comprimento do topo:'),
-                '${result.obstructionWidth.toStringAsFixed(1)}"',
+                spanDisplay,
                 _tr('Ancho exacto del obstáculo', 'Exact obstruction width', ''),
               ),
               const Divider(color: Colors.white24, height: 16),
               _buildResultRow(
                 _tr('Acortamiento total acumulado:', 'Total conduit shrink:',
                     'Encurtamento total acumulado:'),
-                result.totalShrinkFraction,
-                '(${result.totalShrink.toStringAsFixed(2)}")',
+                shrinkDisplay,
+                _secondaryResult(result.totalShrink, result.totalShrinkFraction),
               ),
             ],
           ),
@@ -623,16 +760,16 @@ class _ConduitBendingScreenState extends State<ConduitBendingScreen>
               'Instrucciones de Marcado 4 Curvas:\n'
               'Una montura de 4 curvas consiste en dos offsets tradicionales enfrentados:\n'
               '1. Marca 1: inicio del primer offset.\n'
-              '2. Marca 2: a ${result.distanceBetweenOffsetMarksFraction} de Marca 1.\n'
-              '3. Marca 3: a ${result.obstructionWidth.toStringAsFixed(1)}" de Marca 2 (cruza el obstáculo).\n'
-              '4. Marca 4: a ${result.distanceBetweenOffsetMarksFraction} de Marca 3 (segundo offset hacia abajo).\n'
+              '2. Marca 2: a $pairDistDisplay de Marca 1.\n'
+              '3. Marca 3: a $spanDisplay de Marca 2 (cruza el obstáculo).\n'
+              '4. Marca 4: a $pairDistDisplay de Marca 3 (segundo offset hacia abajo).\n'
               '5. Dobla todas las 4 curvas a ${_saddle4Angle.degrees.toStringAsFixed(0)}° cuidando el sentido del giro para no revirar el tubo.',
               '4-Bend Saddle Instructions:\n'
               'Consists of two opposing offset bends facing each other:\n'
               '1. Mark 1: Start of first offset.\n'
-              '2. Mark 2: At ${result.distanceBetweenOffsetMarksFraction} from Mark 1.\n'
-              '3. Mark 3: At ${result.obstructionWidth.toStringAsFixed(1)}" from Mark 2 across obstruction.\n'
-              '4. Mark 4: At ${result.distanceBetweenOffsetMarksFraction} from Mark 3 for return bend.\n'
+              '2. Mark 2: At $pairDistDisplay from Mark 1.\n'
+              '3. Mark 3: At $spanDisplay from Mark 2 across obstruction.\n'
+              '4. Mark 4: At $pairDistDisplay from Mark 3 for return bend.\n'
               '5. Bend all 4 bends at ${_saddle4Angle.degrees.toStringAsFixed(0)}° maintaining flat plane.',
               'Instruções:\nMarque os dois offsets de cada lado do obstáculo a ${_saddle4Angle.degrees.toStringAsFixed(0)}°.',
             ),

@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:electronorm/screens/calculator_screen.dart';
+import 'package:electronorm/services/storage_service.dart';
 import 'package:electronorm/theme/app_theme.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    StorageService.instance = SharedPreferencesStorageService();
+    await StorageService.instance.setLocale('en');
+    await StorageService.instance.setNormativeCountry(NormativeCountry.usa);
+  });
 
   group('Adversarial Suite 1: Conductor Schedule Rapid Mutation (Add, Increment, Decrement, Clear)', () {
     testWidgets('Rapid clearing of all default conductors results in stable empty state',

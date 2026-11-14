@@ -9,7 +9,10 @@ import '../catalogs/raceway_catalog.dart';
 import '../l10n/app_strings.dart';
 import '../models/calculation_results.dart';
 import '../models/conductor.dart';
+import '../models/normative_profile.dart';
 import '../models/raceway.dart';
+
+export '../models/normative_profile.dart';
 
 /// Technician and company profile information stored locally
 /// to automatically populate technical PDF compliance reports.
@@ -311,11 +314,34 @@ abstract class StorageService implements Listenable {
     }
   }
 
+  /// Auto-detects primary normative country (Mexico NOM-001 vs USA NEC) from device locale/region
+  static NormativeCountry detectDeviceCountry([ui.Locale? localeOverride]) {
+    try {
+      final locale = localeOverride ?? ui.PlatformDispatcher.instance.locale;
+      final country = (locale.countryCode ?? '').toUpperCase();
+      if (country == 'MX') return NormativeCountry.mexico;
+      if (country == 'US') return NormativeCountry.usa;
+      final lang = locale.languageCode.toLowerCase();
+      if (lang.startsWith('en')) return NormativeCountry.usa;
+      return NormativeCountry.mexico;
+    } catch (_) {
+      return NormativeCountry.mexico;
+    }
+  }
+
   // Initialization & Localization
   Future<void> init({ui.Locale? deviceLocaleOverride});
   String get localeCode;
   Future<void> setLocale(String code);
   AppStrings get strings;
+
+  // Country Normative Profile & Measurement Units
+  NormativeCountry get normativeCountry;
+  MeasurementUnitSystem get unitSystem;
+  bool get isMetric;
+  bool get isMexicoProfile;
+  Future<void> setNormativeCountry(NormativeCountry country, {bool syncUnits = true});
+  Future<void> setUnitSystem(MeasurementUnitSystem units);
 
   // Onboarding & Soft Payment Upsell
   Future<bool> hasSeenOnboarding();
@@ -359,12 +385,16 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
   static const String _keyTrialStart = 'electronorm_trial_start_date';
   static const String _keyDemoMode = 'electronorm_demo_mode';
   static const String _keyLocale = 'electronorm_locale_code';
+  static const String _keyNormativeCountry = 'electronorm_normative_country';
+  static const String _keyUnitSystem = 'electronorm_unit_system';
   static const String _keyOnboarding = 'electronorm_has_seen_onboarding';
   static const String _keyAppOpenCount = 'electronorm_app_open_count';
   static const String _keyMonthlyUsagePrefix = 'electronorm_created_month_';
 
   final SharedPreferences? _injectedPrefs;
   String _localeCode = 'es';
+  NormativeCountry _normativeCountry = NormativeCountry.mexico;
+  MeasurementUnitSystem _unitSystem = MeasurementUnitSystem.metric;
   bool _localeInitialized = false;
 
   SharedPreferencesStorageService([this._injectedPrefs]) {
@@ -375,9 +405,31 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
       } else if (!StorageService.isTestEnvironment) {
         _localeCode = StorageService.detectDeviceLocaleCode();
       }
+
+      final savedCountry = _injectedPrefs.getString(_keyNormativeCountry);
+      if (savedCountry != null && savedCountry.isNotEmpty) {
+        _normativeCountry = NormativeCountry.values.firstWhere(
+          (c) => c.name == savedCountry,
+          orElse: () => NormativeCountry.mexico,
+        );
+      } else if (!StorageService.isTestEnvironment) {
+        _normativeCountry = StorageService.detectDeviceCountry();
+      }
+
+      final savedUnits = _injectedPrefs.getString(_keyUnitSystem);
+      if (savedUnits != null && savedUnits.isNotEmpty) {
+        _unitSystem = MeasurementUnitSystem.values.firstWhere(
+          (u) => u.name == savedUnits,
+          orElse: () => _normativeCountry.defaultUnitSystem,
+        );
+      } else {
+        _unitSystem = _normativeCountry.defaultUnitSystem;
+      }
       _localeInitialized = true;
     } else if (!StorageService.isTestEnvironment) {
       _localeCode = StorageService.detectDeviceLocaleCode();
+      _normativeCountry = StorageService.detectDeviceCountry();
+      _unitSystem = _normativeCountry.defaultUnitSystem;
     }
   }
 
@@ -393,6 +445,27 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
     } else {
       _localeCode = StorageService.detectDeviceLocaleCode(deviceLocaleOverride);
     }
+
+    final savedCountry = prefs.getString(_keyNormativeCountry);
+    if (savedCountry != null && savedCountry.isNotEmpty) {
+      _normativeCountry = NormativeCountry.values.firstWhere(
+        (c) => c.name == savedCountry,
+        orElse: () => NormativeCountry.mexico,
+      );
+    } else {
+      _normativeCountry = StorageService.detectDeviceCountry(deviceLocaleOverride);
+    }
+
+    final savedUnits = prefs.getString(_keyUnitSystem);
+    if (savedUnits != null && savedUnits.isNotEmpty) {
+      _unitSystem = MeasurementUnitSystem.values.firstWhere(
+        (u) => u.name == savedUnits,
+        orElse: () => _normativeCountry.defaultUnitSystem,
+      );
+    } else {
+      _unitSystem = _normativeCountry.defaultUnitSystem;
+    }
+
     _localeInitialized = true;
     notifyListeners();
   }
@@ -404,12 +477,52 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
   AppStrings get strings => AppStrings.get(_localeCode);
 
   @override
+  NormativeCountry get normativeCountry => _normativeCountry;
+
+  @override
+  MeasurementUnitSystem get unitSystem => _unitSystem;
+
+  @override
+  bool get isMetric => _unitSystem == MeasurementUnitSystem.metric;
+
+  @override
+  bool get isMexicoProfile => _normativeCountry == NormativeCountry.mexico;
+
+  @override
   Future<void> setLocale(String code) async {
     if (_localeCode == code) return;
     _localeCode = code;
     _localeInitialized = true;
     final prefs = await _getPrefs();
     await prefs.setString(_keyLocale, code);
+    notifyListeners();
+  }
+
+  @override
+  Future<void> setNormativeCountry(
+    NormativeCountry country, {
+    bool syncUnits = true,
+  }) async {
+    final targetUnits = syncUnits ? country.defaultUnitSystem : _unitSystem;
+    if (_normativeCountry == country && _unitSystem == targetUnits) return;
+    _normativeCountry = country;
+    _unitSystem = targetUnits;
+    _localeInitialized = true;
+    final prefs = await _getPrefs();
+    await prefs.setString(_keyNormativeCountry, country.name);
+    if (syncUnits) {
+      await prefs.setString(_keyUnitSystem, _unitSystem.name);
+    }
+    notifyListeners();
+  }
+
+  @override
+  Future<void> setUnitSystem(MeasurementUnitSystem units) async {
+    if (_unitSystem == units) return;
+    _unitSystem = units;
+    _localeInitialized = true;
+    final prefs = await _getPrefs();
+    await prefs.setString(_keyUnitSystem, units.name);
     notifyListeners();
   }
 
@@ -486,6 +599,30 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
         }
       } else if (!StorageService.isTestEnvironment) {
         _localeCode = StorageService.detectDeviceLocaleCode();
+      }
+
+      if (prefs.containsKey(_keyNormativeCountry)) {
+        final savedCountry = prefs.getString(_keyNormativeCountry);
+        if (savedCountry != null && savedCountry.isNotEmpty) {
+          _normativeCountry = NormativeCountry.values.firstWhere(
+            (c) => c.name == savedCountry,
+            orElse: () => NormativeCountry.mexico,
+          );
+        }
+      } else if (!StorageService.isTestEnvironment) {
+        _normativeCountry = StorageService.detectDeviceCountry();
+      }
+
+      if (prefs.containsKey(_keyUnitSystem)) {
+        final savedUnits = prefs.getString(_keyUnitSystem);
+        if (savedUnits != null && savedUnits.isNotEmpty) {
+          _unitSystem = MeasurementUnitSystem.values.firstWhere(
+            (u) => u.name == savedUnits,
+            orElse: () => _normativeCountry.defaultUnitSystem,
+          );
+        }
+      } else if (!StorageService.isTestEnvironment) {
+        _unitSystem = _normativeCountry.defaultUnitSystem;
       }
     }
     return prefs;
@@ -572,9 +709,13 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
     await prefs.remove(_keyTrialStart);
     await prefs.remove(_keyDemoMode);
     await prefs.remove(_keyLocale);
+    await prefs.remove(_keyNormativeCountry);
+    await prefs.remove(_keyUnitSystem);
     await prefs.remove(_keyOnboarding);
     await prefs.remove(_keyAppOpenCount);
     _localeCode = 'es';
+    _normativeCountry = NormativeCountry.mexico;
+    _unitSystem = MeasurementUnitSystem.metric;
     notifyListeners();
   }
 

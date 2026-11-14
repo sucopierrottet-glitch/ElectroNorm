@@ -1,16 +1,25 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:electronorm/catalogs/conductor_catalog.dart';
 import 'package:electronorm/catalogs/raceway_catalog.dart';
 import 'package:electronorm/models/conductor.dart';
 import 'package:electronorm/models/raceway.dart';
 import 'package:electronorm/screens/calculator_screen.dart';
+import 'package:electronorm/services/storage_service.dart';
 import 'package:electronorm/theme/app_theme.dart';
 import 'package:electronorm/widgets/packing_algorithm.dart';
 
 void main() {
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    StorageService.instance = SharedPreferencesStorageService();
+    await StorageService.instance.setLocale('en');
+    await StorageService.instance.setNormativeCountry(NormativeCountry.usa);
+  });
+
   group('Reviewer M2 Adversarial Suite: Boundary Checks & Stress Invariants', () {
     testWidgets('Boundary 1: Empty conductor schedule renders gracefully without crashes',
         (tester) async {
@@ -42,7 +51,7 @@ void main() {
 
       // Verify derating and voltage drop cards survive empty schedule
       expect(find.textContaining('Final Allowable Ampacity:'), findsOneWidget);
-      expect(find.textContaining('Branch Limit: 3%'), findsOneWidget);
+      expect(find.textContaining('Branch 3% | Total 5%'), findsOneWidget);
     });
 
     testWidgets('Boundary 2: Single large conductor (500 kcmil in 1/2" EMT) triggers overfill & upsizes to 1-1/4" EMT',

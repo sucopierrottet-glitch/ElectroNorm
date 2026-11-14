@@ -612,10 +612,12 @@ void main() {
   group('Challenger M4: SavedProjectsScreen UI Stress Testing', () {
     late SharedPreferencesStorageService storageService;
 
-    setUp(() {
+    setUp(() async {
       SharedPreferences.setMockInitialValues({});
       storageService = SharedPreferencesStorageService();
       StorageService.instance = storageService;
+      await storageService.setLocale('en');
+      await storageService.setNormativeCountry(NormativeCountry.usa);
     });
 
     testWidgets('4.1 Multi-Criteria Sorting on 100 Saved Calculations in UI', (tester) async {
@@ -814,6 +816,8 @@ void main() {
         'electronorm_technician_profile': '1234567890',
       });
       StorageService.instance = SharedPreferencesStorageService();
+      await StorageService.instance.setLocale('en');
+      await StorageService.instance.setNormativeCountry(NormativeCountry.usa);
 
       await tester.pumpWidget(
         const MaterialApp(
@@ -835,6 +839,8 @@ void main() {
         'electronorm_demo_mode': 99999,
       });
       StorageService.instance = SharedPreferencesStorageService();
+      await StorageService.instance.setLocale('en');
+      await StorageService.instance.setNormativeCountry(NormativeCountry.usa);
 
       await tester.pumpWidget(
         const MaterialApp(
@@ -862,6 +868,8 @@ void main() {
     testWidgets('5.3 CalculatorScreen Loads Saved Calculation with Null Optional Fields Safely', (tester) async {
       final storageService = SharedPreferencesStorageService();
       StorageService.instance = storageService;
+      await storageService.setLocale('en');
+      await storageService.setNormativeCountry(NormativeCountry.usa);
 
       // Create calculation with null optional fields and boundary parameters
       final boundaryCalc = buildAdversarialCalculation(

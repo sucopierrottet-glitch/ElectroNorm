@@ -80,6 +80,13 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
     }
   }
 
+  String _tr(String es, String en, String pt) {
+    final lang = StorageService.instance.localeCode.toLowerCase();
+    if (lang.startsWith('en')) return en;
+    if (lang.startsWith('pt')) return pt;
+    return es;
+  }
+
   Future<void> _deleteCalculation(SavedCalculation item) async {
     await StorageService.instance.deleteCalculation(item.id);
     await _loadCalculations();
@@ -88,7 +95,8 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
         SnackBar(
           backgroundColor: AppColors.surfaceElevated,
           content: Text(
-            'Deleted "${item.title}"',
+            _tr('Eliminado "${item.title}"', 'Deleted "${item.title}"',
+                'Excluído "${item.title}"'),
             style: const TextStyle(color: AppColors.textPrimary),
           ),
           behavior: SnackBarBehavior.floating,
@@ -103,26 +111,33 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppColors.surfaceCard,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: AppColors.overfilled, size: 26),
-            SizedBox(width: 8),
+            const Icon(Icons.warning_amber_rounded, color: AppColors.overfilled, size: 26),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Delete Calculation?',
-                style: TextStyle(color: AppColors.textPrimary, fontSize: 18),
+                _tr('¿Eliminar Cálculo?', 'Delete Calculation?', 'Excluir Cálculo?'),
+                style: const TextStyle(color: AppColors.textPrimary, fontSize: 18),
               ),
             ),
           ],
         ),
         content: Text(
-          'Are you sure you want to permanently delete "${item.title}"? This action cannot be undone.',
+          _tr(
+            '¿Seguro que deseas eliminar permanentemente "${item.title}"? Esta acción no se puede deshacer.',
+            'Are you sure you want to permanently delete "${item.title}"? This action cannot be undone.',
+            'Tem certeza de que deseja excluir permanentemente "${item.title}"?',
+          ),
           style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textTertiary)),
+            child: Text(
+              _tr('Cancelar', 'Cancel', 'Cancelar'),
+              style: const TextStyle(color: AppColors.textTertiary),
+            ),
           ),
           ElevatedButton(
             key: const Key('btnConfirmDelete'),
@@ -131,7 +146,10 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(
+              _tr('Eliminar', 'Delete', 'Excluir'),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -139,15 +157,20 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
   }
 
   void _exportSavedProject(SavedCalculation item) async {
-    final profile = await StorageService.instance.getProfile();
+    final storage = StorageService.instance;
+    final profile = await storage.getProfile();
     final ccc = item.conductors
         .where((g) => g.role != 'ground')
         .fold(0, (sum, g) => sum + g.count);
 
     final reportData = ComplianceReportData(
       projectTitle: item.title,
-      clientName: item.clientName.isEmpty ? 'Client Facility' : item.clientName,
-      siteAddress: item.siteAddress.isEmpty ? 'Site Conduit Installation' : item.siteAddress,
+      clientName: item.clientName.isEmpty
+          ? _tr('Cliente / Instalación', 'Client Facility', 'Cliente / Instalação')
+          : item.clientName,
+      siteAddress: item.siteAddress.isEmpty
+          ? _tr('Sitio de Instalación Eléctrica', 'Site Conduit Installation', 'Local da Obra')
+          : item.siteAddress,
       technicianName: profile.technicianName,
       companyName: profile.companyName,
       date: item.timestamp,
@@ -167,6 +190,9 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
       terminalRatingC: item.terminalRatingC,
       cccCount: ccc,
       signaturePngBytes: profile.defaultSignatureBytes,
+      localeCode: storage.localeCode,
+      normativeCountry: storage.normativeCountry,
+      useMetricUnits: storage.isMetric,
     );
 
     if (mounted) {
@@ -184,7 +210,8 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
         final q = _searchQuery.toLowerCase();
         final matchesTitle = item.title.toLowerCase().contains(q);
         final matchesNotes = item.notes.toLowerCase().contains(q);
-        final matchesSize = item.tradeSize.toLowerCase().contains(q);
+        final matchesSize = item.tradeSize.toLowerCase().contains(q) ||
+            item.raceway.metricDesignator.toLowerCase().contains(q);
         final matchesType = item.raceway.type.displayName.toLowerCase().contains(q);
         final matchesClient = item.clientName.toLowerCase().contains(q);
         if (!matchesTitle && !matchesNotes && !matchesSize && !matchesType && !matchesClient) {
@@ -232,6 +259,9 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final storage = StorageService.instance;
+    final country = storage.normativeCountry;
+    final isMetric = storage.isMetric;
     final items = _filteredAndSortedCalculations;
     final compliantCount =
         _allCalculations.where((c) => c.fillResult.fillPercentage <= 40.0).length;
@@ -242,7 +272,7 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
     return Scaffold(
       backgroundColor: AppColors.bgDark,
       appBar: AppBar(
-        title: const Text('Saved Projects'),
+        title: Text(_tr('Proyectos Guardados', 'Saved Projects', 'Projetos Salvos')),
         actions: [
           if (!_isPro)
             Padding(
@@ -260,7 +290,7 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
                   ),
                   child: Center(
                     child: Text(
-                      '$_remainingFree/3 Free',
+                      '$_remainingFree/3 ${_tr("Gratis", "Free", "Grátis")}',
                       style: const TextStyle(
                         fontSize: 10,
                         color: Colors.amber,
@@ -274,25 +304,26 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
           PopupMenuButton<SortOption>(
             key: const Key('btnSortProjects'),
             icon: const Icon(Icons.sort_rounded),
-            tooltip: 'Sort Calculations',
+            tooltip: _tr('Ordenar Cálculos', 'Sort Calculations', 'Ordenar Cálculos'),
             initialValue: _selectedSort,
             onSelected: (val) => setState(() => _selectedSort = val),
-            itemBuilder: (ctx) => const [
+            itemBuilder: (ctx) => [
               PopupMenuItem(
                 value: SortOption.newest,
-                child: Text('Newest First'),
+                child: Text(_tr('Más recientes', 'Newest First', 'Mais recentes')),
               ),
               PopupMenuItem(
                 value: SortOption.oldest,
-                child: Text('Oldest First'),
+                child: Text(_tr('Más antiguos', 'Oldest First', 'Mais antigos')),
               ),
               PopupMenuItem(
                 value: SortOption.alphabetical,
-                child: Text('Alphabetical (A - Z)'),
+                child: Text(_tr('Alfabético (A - Z)', 'Alphabetical (A - Z)', 'Alfabético (A - Z)')),
               ),
               PopupMenuItem(
                 value: SortOption.fillPercentage,
-                child: Text('Fill Percentage (High to Low)'),
+                child: Text(_tr('Porcentaje de Llenado', 'Fill Percentage (High to Low)',
+                    'Percentual de Ocupação')),
               ),
             ],
           ),
@@ -311,9 +342,10 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
                       children: [
                         Expanded(
                           child: StatCard(
-                            title: 'Proyectos',
+                            title: _tr('Proyectos', 'Projects', 'Projetos'),
                             value: '${_allCalculations.length}',
-                            subtitle: '$compliantCount Cumplen NEC',
+                            subtitle:
+                                '$compliantCount ${_tr("Cumplen", "Compliant", "Conformes")} ${country.shortCode}',
                             icon: Icons.check_circle_outline_rounded,
                             accentColor: AppTheme.success,
                           ),
@@ -321,9 +353,11 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: StatCard(
-                            title: 'En Alerta',
+                            title: _tr('En Alerta', 'Alerts', 'Em Alerta'),
                             value: '$alertCount',
-                            subtitle: alertCount == 0 ? '0 Violaciones' : 'Revisar Llenado',
+                            subtitle: alertCount == 0
+                                ? _tr('0 Violaciones', '0 Violations', '0 Violações')
+                                : _tr('Revisar Llenado', 'Check Fill', 'Revisar Ocupação'),
                             icon: Icons.warning_amber_rounded,
                             accentColor:
                                 alertCount == 0 ? AppTheme.accent : AppTheme.warning,
@@ -342,7 +376,11 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
                     onChanged: (val) => setState(() => _searchQuery = val.trim()),
                     style: const TextStyle(color: AppColors.textPrimary, fontSize: 14),
                     decoration: InputDecoration(
-                      hintText: 'Search by title, notes, raceway size...',
+                      hintText: _tr(
+                        'Buscar por título, notas, diámetro DN...',
+                        'Search by title, notes, raceway size...',
+                        'Buscar por título, notas, bitola...',
+                      ),
                       hintStyle: const TextStyle(color: AppColors.textTertiary, fontSize: 13),
                       prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary, size: 20),
                       suffixIcon: _searchQuery.isNotEmpty
@@ -379,15 +417,21 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   child: Row(
                     children: [
-                      _buildFilterChip('All (${_allCalculations.length})', FilterOption.all),
+                      _buildFilterChip(
+                          '${_tr("Todos", "All", "Todos")} (${_allCalculations.length})',
+                          FilterOption.all),
                       const SizedBox(width: 8),
-                      _buildFilterChip('Compliant', FilterOption.compliant),
+                      _buildFilterChip(
+                          _tr('Cumplen', 'Compliant', 'Conformes'), FilterOption.compliant),
                       const SizedBox(width: 8),
-                      _buildFilterChip('Caution', FilterOption.caution),
+                      _buildFilterChip(
+                          _tr('Precaución', 'Caution', 'Atenção'), FilterOption.caution),
                       const SizedBox(width: 8),
-                      _buildFilterChip('Overfilled', FilterOption.overfilled),
+                      _buildFilterChip(
+                          _tr('Excedido', 'Overfilled', 'Excedido'), FilterOption.overfilled),
                       const SizedBox(width: 8),
-                      _buildFilterChip('Jam Hazard', FilterOption.jamRisk),
+                      _buildFilterChip(
+                          _tr('Atascamiento', 'Jam Hazard', 'Travamento'), FilterOption.jamRisk),
                     ],
                   ),
                 ),
@@ -403,7 +447,7 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
                           itemCount: items.length,
                           itemBuilder: (context, index) {
                             final item = items[index];
-                            return _buildProjectCard(item);
+                            return _buildProjectCard(item, isMetric: isMetric);
                           },
                         ),
                 ),
@@ -458,8 +502,10 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
             const SizedBox(height: 16),
             Text(
               _searchQuery.isNotEmpty
-                  ? 'No Calculations Match "$_searchQuery"'
-                  : 'No Saved Calculations Yet',
+                  ? _tr('Sin resultados para "$_searchQuery"',
+                      'No Calculations Match "$_searchQuery"', 'Nenhum resultado para "$_searchQuery"')
+                  : _tr('Aún no hay cálculos guardados', 'No Saved Calculations Yet',
+                      'Nenhum cálculo salvo ainda'),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 17,
@@ -470,8 +516,16 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
             const SizedBox(height: 8),
             Text(
               _searchQuery.isNotEmpty
-                  ? 'Try adjusting your search terms or filter criteria.'
-                  : 'Perform a conduit calculation and tap "Save Run" to keep project records offline.',
+                  ? _tr(
+                      'Intenta ajustar tu búsqueda o los criterios de filtro.',
+                      'Try adjusting your search terms or filter criteria.',
+                      'Tente ajustar os termos de busca ou filtros.',
+                    )
+                  : _tr(
+                      'Realiza un cálculo de tubería y presiona "Guardar" para mantener tus registros sin conexión.',
+                      'Perform a conduit calculation and tap "Save Run" to keep project records offline.',
+                      'Realize um cálculo e toque em "Salvar" para manter registros offline.',
+                    ),
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.4),
             ),
@@ -484,7 +538,10 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
               icon: const Icon(Icons.arrow_back, size: 18),
-              label: const Text('Back to Calculator', style: TextStyle(fontWeight: FontWeight.bold)),
+              label: Text(
+                _tr('Volver a Calculadora', 'Back to Calculator', 'Voltar à Calculadora'),
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
               onPressed: () {
                 if (widget.onBackToCalculator != null) {
                   widget.onBackToCalculator!();
@@ -499,11 +556,17 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
     );
   }
 
-  Widget _buildProjectCard(SavedCalculation item) {
+  Widget _buildProjectCard(SavedCalculation item, {required bool isMetric}) {
     final fill = item.fillResult.fillPercentage;
     final fillColor = _getFillColor(fill);
     final totalConductors = item.conductors.fold(0, (sum, g) => sum + g.count);
     final dateStr = DateFormat('yyyy-MM-dd HH:mm').format(item.timestamp);
+    final racewaySizeLabel = NormativeFormatters.formatRacewaySize(
+      item.tradeSize,
+      type: item.raceway.type,
+      metricDesignator: item.raceway.metricDesignator,
+      isMetric: isMetric,
+    );
 
     return Dismissible(
       key: Key('dismissible_${item.id}'),
@@ -516,12 +579,13 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
           borderRadius: BorderRadius.circular(14),
         ),
         alignment: Alignment.centerRight,
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            Icon(Icons.delete_forever, color: Colors.white, size: 26),
-            SizedBox(width: 8),
-            Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            const Icon(Icons.delete_forever, color: Colors.white, size: 26),
+            const SizedBox(width: 8),
+            Text(_tr('Eliminar', 'Delete', 'Excluir'),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ],
         ),
       ),
@@ -583,14 +647,16 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
                       children: [
                         IconButton(
                           key: Key('btnExportPdf_${item.id}'),
-                          icon: const Icon(Icons.picture_as_pdf_outlined, color: AppColors.textSecondary, size: 20),
-                          tooltip: 'Export PDF',
+                          icon: const Icon(Icons.picture_as_pdf_outlined,
+                              color: AppColors.textSecondary, size: 20),
+                          tooltip: _tr('Exportar PDF', 'Export PDF', 'Exportar PDF'),
                           onPressed: () => _exportSavedProject(item),
                         ),
                         IconButton(
                           key: Key('btnDeleteProject_${item.id}'),
-                          icon: const Icon(Icons.delete_outline, color: AppColors.textSecondary, size: 20),
-                          tooltip: 'Delete',
+                          icon: const Icon(Icons.delete_outline,
+                              color: AppColors.textSecondary, size: 20),
+                          tooltip: _tr('Eliminar', 'Delete', 'Excluir'),
                           onPressed: () async {
                             final confirm = await _showDeleteConfirmationDialog(item);
                             if (confirm == true) {
@@ -632,7 +698,7 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
                         border: Border.all(color: AppColors.borderHighContrast),
                       ),
                       child: Text(
-                        '${item.tradeSize}" ${item.raceway.type.displayName}',
+                        '$racewaySizeLabel ${item.raceway.type.displayName}',
                         style: const TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -650,7 +716,7 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
                         border: Border.all(color: AppColors.borderSubtle),
                       ),
                       child: Text(
-                        '$totalConductors Conductors',
+                        '$totalConductors ${_tr("Conductores", "Conductors", "Condutores")}',
                         style: const TextStyle(
                           fontSize: 11,
                           color: AppColors.textSecondary,
@@ -667,7 +733,7 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
                         border: Border.all(color: fillColor, width: 1.2),
                       ),
                       child: Text(
-                        '${fill.toStringAsFixed(1)}% Fill',
+                        '${fill.toStringAsFixed(1)}% ${_tr("Llenado", "Fill", "Ocupação")}',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
@@ -685,14 +751,14 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(color: AppColors.caution, width: 1.2),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.warning, color: AppColors.caution, size: 12),
-                            SizedBox(width: 4),
+                            const Icon(Icons.warning, color: AppColors.caution, size: 12),
+                            const SizedBox(width: 4),
                             Text(
-                              'JAM HAZARD',
-                              style: TextStyle(
+                              _tr('ATASCAMIENTO', 'JAM HAZARD', 'TRAVAMENTO'),
+                              style: const TextStyle(
                                 fontSize: 10,
                                 fontWeight: FontWeight.bold,
                                 color: AppColors.caution,
@@ -719,7 +785,7 @@ class _SavedProjectsScreenState extends State<SavedProjectsScreen> {
                           ),
                         ),
                         child: Text(
-                          '${item.voltageDropResult!.percentageDrop.toStringAsFixed(1)}% VD',
+                          '${item.voltageDropResult!.percentageDrop.toStringAsFixed(1)}% ${_tr("ΔV", "VD", "ΔV")}',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,

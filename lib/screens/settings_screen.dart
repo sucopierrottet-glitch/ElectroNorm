@@ -230,6 +230,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final storage = _storage;
         final s = storage.strings;
         final currentLang = storage.localeCode;
+        final currentCountry = storage.normativeCountry;
+        final isMetric = storage.isMetric;
+        final isMexico = storage.isMexicoProfile;
 
         return Scaffold(
           backgroundColor: AppTheme.darkBg,
@@ -251,7 +254,95 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // 0. Language Selector (Same place and design as FieldQuote)
+                      // 0A. Country / Normative Code Profile Selector
+                      _buildSectionTitle(context, s.normativeProfileHeader),
+                      const SizedBox(height: 6),
+                      Text(
+                        s.normativeProfileSubtitle,
+                        style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
+                      ),
+                      const SizedBox(height: 10),
+                      Material(
+                        color: AppTheme.darkCard,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          side: const BorderSide(color: AppTheme.darkBorder),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          children: [
+                            _buildCountryProfileOption(
+                              country: NormativeCountry.mexico,
+                              flag: '🇲🇽',
+                              title: _tr(
+                                'México — NOM-001-SEDE',
+                                'Mexico — NOM-001-SEDE',
+                                'México — NOM-001-SEDE',
+                              ),
+                              subtitle: _tr(
+                                'Unidades métricas (m, mm², DN) • 127/220/440V • UVIE',
+                                'Metric units (m, mm², DN) • 127/220/440V • UVIE',
+                                'Unidades métricas (m, mm², DN) • 127/220/440V',
+                              ),
+                              isSelected: currentCountry == NormativeCountry.mexico,
+                            ),
+                            const Divider(height: 1, color: AppTheme.darkBorder),
+                            _buildCountryProfileOption(
+                              country: NormativeCountry.usa,
+                              flag: '🇺🇸',
+                              title: _tr(
+                                'Estados Unidos — NEC (NFPA 70)',
+                                'USA — NEC (NFPA 70)',
+                                'EUA — NEC (NFPA 70)',
+                              ),
+                              subtitle: _tr(
+                                'Unidades imperiales (ft, in², ") • 120/208/240/480V • AHJ',
+                                'Imperial units (ft, in², ") • 120/208/240/480V • AHJ',
+                                'Unidades imperiais (ft, in², ") • 120/208/240/480V',
+                              ),
+                              isSelected: currentCountry == NormativeCountry.usa,
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+
+                      // 0B. Measurement Unit System Toggle
+                      _buildSectionTitle(context, s.unitsHeader),
+                      const SizedBox(height: 10),
+                      SegmentedButton<MeasurementUnitSystem>(
+                        segments: [
+                          ButtonSegment<MeasurementUnitSystem>(
+                            value: MeasurementUnitSystem.metric,
+                            icon: const Icon(Icons.straighten_rounded, size: 16),
+                            label: Text(
+                              s.unitsMetricLabel,
+                              key: const Key('unit_option_metric'),
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                          ButtonSegment<MeasurementUnitSystem>(
+                            value: MeasurementUnitSystem.imperial,
+                            icon: const Icon(Icons.square_foot_rounded, size: 16),
+                            label: Text(
+                              s.unitsImperialLabel,
+                              key: const Key('unit_option_imperial'),
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ],
+                        selected: {
+                          isMetric ? MeasurementUnitSystem.metric : MeasurementUnitSystem.imperial
+                        },
+                        onSelectionChanged: (selected) {
+                          storage.setUnitSystem(selected.first);
+                        },
+                      ),
+                      const SizedBox(height: 24),
+
+                      // 0C. Language Selector
                       _buildSectionTitle(context, _tr('IDIOMA / LANGUAGE', 'LANGUAGE', 'IDIOMA')),
                       const SizedBox(height: 10),
                       Material(
@@ -265,7 +356,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           children: [
                             _buildLanguageOption(
                               code: 'es',
-                              flag: '🇪🇸',
+                              flag: '🌐',
                               label: 'Español',
                               currentLang: currentLang,
                             ),
@@ -400,7 +491,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       controller: _agencyController,
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
-                        labelText: s.agencyNameLabel,
+                        labelText: isMexico
+                            ? _tr(
+                                'UVIE / Organismo Verificador (Opcional)',
+                                'UVIE / Inspection Agency (Optional)',
+                                'Órgão Verificador (Opcional)',
+                              )
+                            : s.agencyNameLabel,
                         prefixIcon:
                             const Icon(Icons.work_outline_rounded, color: Color(0xFF94A3B8)),
                       ),
@@ -411,7 +508,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       controller: _licenseController,
                       style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
-                        labelText: s.licenseNumberLabel,
+                        labelText: isMexico
+                            ? _tr(
+                                'Cédula Profesional / Registro UVIE',
+                                'Professional License / UVIE ID',
+                                'Registro Profissional',
+                              )
+                            : s.licenseNumberLabel,
                         prefixIcon: const Icon(Icons.badge_outlined, color: Color(0xFF94A3B8)),
                       ),
                     ),
@@ -593,8 +696,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              _buildStandardChip('NEC (NFPA 70)'),
-                              _buildStandardChip('NOM-001-SEDE'),
+                              _buildStandardChip('NOM-001-SEDE', isActive: isMexico),
+                              _buildStandardChip('NEC (NFPA 70)', isActive: !isMexico),
                               _buildStandardChip('RETIE'),
                               _buildStandardChip('NBR 5410'),
                               _buildStandardChip('IEC 60364'),
@@ -825,6 +928,35 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildCountryProfileOption({
+    required NormativeCountry country,
+    required String flag,
+    required String title,
+    required String subtitle,
+    required bool isSelected,
+  }) {
+    return ListTile(
+      key: Key('profile_option_${country.name}'),
+      onTap: () => _storage.setNormativeCountry(country),
+      leading: Text(flag, style: const TextStyle(fontSize: 24)),
+      title: Text(
+        title,
+        style: TextStyle(
+          color: Colors.white,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          fontSize: 14,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(color: AppTheme.textSecondary, fontSize: 11.5),
+      ),
+      trailing: isSelected
+          ? const Icon(Icons.check_circle_rounded, color: AppTheme.primary)
+          : const Icon(Icons.radio_button_unchecked_rounded, color: Color(0xFF64748B)),
+    );
+  }
+
   Widget _buildLanguageOption({
     required String code,
     required String flag,
@@ -860,25 +992,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildStandardChip(String label) {
+  Widget _buildStandardChip(String label, {bool isActive = false}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: AppTheme.darkSurface,
+        color: isActive ? AppTheme.primary.withValues(alpha: 0.16) : AppTheme.darkSurface,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.darkBorder),
+        border: Border.all(
+          color: isActive ? AppTheme.primary : AppTheme.darkBorder,
+          width: isActive ? 1.4 : 1.0,
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.verified_outlined, color: AppTheme.success, size: 14),
+          Icon(
+            isActive ? Icons.check_circle_rounded : Icons.verified_outlined,
+            color: isActive ? AppTheme.primary : AppTheme.success,
+            size: 14,
+          ),
           const SizedBox(width: 6),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
               fontSize: 12,
-              fontWeight: FontWeight.w600,
+              fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
             ),
           ),
         ],

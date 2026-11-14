@@ -1,14 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:electronorm/catalogs/conductor_catalog.dart';
 import 'package:electronorm/models/conductor.dart';
 import 'package:electronorm/screens/calculator_screen.dart';
+import 'package:electronorm/services/storage_service.dart';
 import 'package:electronorm/theme/app_theme.dart';
 import 'package:electronorm/widgets/packing_algorithm.dart';
 import 'package:electronorm/widgets/raceway_painter.dart';
 
 void main() {
+  setUp(() async {
+    SharedPreferences.setMockInitialValues({});
+    StorageService.instance = SharedPreferencesStorageService();
+    await StorageService.instance.setLocale('en');
+    await StorageService.instance.setNormativeCountry(NormativeCountry.usa);
+  });
+
   group('RacewayPainter & RacewayVisualizer Widget Tests', () {
     testWidgets('RacewayPainter paints without throwing on compliant state',
         (tester) async {
@@ -277,7 +286,7 @@ void main() {
       await tester.pumpAndSettle();
 
       // Voltage drop displays allowable drop and end voltage
-      expect(find.textContaining('Branch Limit: 3%'), findsOneWidget);
+      expect(find.textContaining('Branch 3% | Total 5%'), findsOneWidget);
       expect(find.textContaining('1-Phase'), findsOneWidget);
       expect(find.textContaining('3-Phase'), findsOneWidget);
 

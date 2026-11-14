@@ -36,9 +36,11 @@ final Uint8List kTestTransparentPngBytes = Uint8List.fromList(<int>[
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
+  setUp(() async {
     SharedPreferences.setMockInitialValues({});
     StorageService.instance = SharedPreferencesStorageService();
+    await StorageService.instance.setLocale('en');
+    await StorageService.instance.setNormativeCountry(NormativeCountry.usa);
 
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(const MethodChannel('net.nfet.printing'), (MethodCall methodCall) async {

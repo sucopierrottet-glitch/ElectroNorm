@@ -30,12 +30,20 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
     _data = widget.reportData;
   }
 
+  String _tr(String es, String en, String pt) {
+    final lang = StorageService.instance.localeCode.toLowerCase();
+    if (lang.startsWith('en')) return en;
+    if (lang.startsWith('pt')) return pt;
+    return es;
+  }
+
   Future<void> _captureSignature() async {
     final result = await SignatureDialog.show(
       context,
       inspectorName: _data.inspectorName,
       licenseNumber: _data.licenseNumber,
       agencyName: _data.agencyName,
+      normativeCountry: _data.normativeCountry,
     );
 
     if (result != null && mounted) {
@@ -57,7 +65,11 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Inspector signature embedded for ${result.inspectorName}',
+                  _tr(
+                    'Firma de verificación incorporada para ${result.inspectorName}',
+                    'Inspector signature embedded for ${result.inspectorName}',
+                    'Assinatura incorporada para ${result.inspectorName}',
+                  ),
                   style: const TextStyle(color: AppColors.textPrimary),
                 ),
               ),
@@ -89,7 +101,7 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.overfilled,
-            content: Text('Failed to share report: $e'),
+            content: Text('${_tr("Error al compartir", "Failed to share report", "Erro ao compartilhar")}: $e'),
           ),
         );
       }
@@ -111,15 +123,18 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.check_circle, color: AppColors.compliant, size: 18),
-                    SizedBox(width: 6),
-                    Text(
-                      'PDF Exported Successfully',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                    const Icon(Icons.check_circle, color: AppColors.compliant, size: 18),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _tr('PDF Exportado Correctamente', 'PDF Exported Successfully',
+                            'PDF Exportado com Sucesso'),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
                     ),
                   ],
@@ -145,7 +160,7 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             backgroundColor: AppColors.overfilled,
-            content: Text('Error exporting file: $e'),
+            content: Text('${_tr("Error al exportar", "Error exporting file", "Erro ao exportar")}: $e'),
           ),
         );
       }
@@ -159,6 +174,10 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
   @override
   Widget build(BuildContext context) {
     final hasSignature = _data.signaturePngBytes != null && _data.signaturePngBytes!.isNotEmpty;
+    final country = _data.normativeCountry;
+    final defaultSubtitle = country == NormativeCountry.mexico
+        ? _tr('Verificación NOM-001-SEDE', 'NOM-001-SEDE Verification', 'Verificação NOM-001')
+        : _tr('Verificación NFPA 70 / NEC', 'NFPA 70 Verification', 'Verificação NFPA 70');
 
     return Scaffold(
       backgroundColor: AppColors.bgDark,
@@ -166,9 +185,13 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Compliance Report Preview', style: TextStyle(fontSize: 16)),
             Text(
-              _data.projectTitle.isEmpty ? 'NFPA 70 Verification' : _data.projectTitle,
+              _tr('Vista Previa de Dictamen PDF', 'Compliance Report Preview',
+                  'Pré-visualização do Relatório'),
+              style: const TextStyle(fontSize: 16),
+            ),
+            Text(
+              _data.projectTitle.isEmpty ? defaultSubtitle : _data.projectTitle,
               style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
           ],
@@ -176,7 +199,8 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.share_outlined),
-            tooltip: 'Share PDF via WhatsApp / Email',
+            tooltip: _tr('Compartir PDF por WhatsApp / Correo',
+                'Share PDF via WhatsApp / Email', 'Compartilhar PDF'),
             onPressed: _shareReport,
           ),
           IconButton(
@@ -187,7 +211,8 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.compliant),
                   )
                 : const Icon(Icons.file_download_outlined),
-            tooltip: 'Download to Device Storage',
+            tooltip: _tr('Descargar en Dispositivo', 'Download to Device Storage',
+                'Baixar no Dispositivo'),
             onPressed: _isExporting ? null : _exportToStorage,
           ),
         ],
@@ -199,15 +224,16 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
           canChangePageFormat: false,
           canDebug: false,
           maxPageWidth: 720,
-          loadingWidget: const Center(
+          loadingWidget: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                CircularProgressIndicator(color: AppColors.compliant),
-                SizedBox(height: 12),
+                const CircularProgressIndicator(color: AppColors.compliant),
+                const SizedBox(height: 12),
                 Text(
-                  'Rendering Technical Compliance Memorandum...',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  _tr('Generando Memoria Técnica...', 'Rendering Technical Compliance Memorandum...',
+                      'Gerando Relatório Técnico...'),
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
                 ),
               ],
             ),
@@ -256,7 +282,11 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      hasSignature ? 'Inspector Sign-Off Verified' : 'Inspection Signature Pending',
+                      hasSignature
+                          ? _tr('Firma de Inspección Verificada', 'Inspector Sign-Off Verified',
+                              'Assinatura Verificada')
+                          : _tr('Firma de Inspección Pendiente', 'Inspection Signature Pending',
+                              'Assinatura Pendente'),
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
@@ -265,8 +295,16 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
                     ),
                     Text(
                       hasSignature
-                          ? 'Signed by ${_data.inspectorName} (${_data.agencyName})'
-                          : 'Tap to capture technician or AHJ signature',
+                          ? _tr(
+                              'Firmado por ${_data.inspectorName} (${_data.agencyName})',
+                              'Signed by ${_data.inspectorName} (${_data.agencyName})',
+                              'Assinado por ${_data.inspectorName} (${_data.agencyName})',
+                            )
+                          : _tr(
+                              'Toca para capturar firma del técnico / ${country.inspectionAuthorityShort}',
+                              'Tap to capture technician or AHJ signature',
+                              'Toque para capturar assinatura técnica',
+                            ),
                       style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -284,7 +322,9 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
                 ),
                 icon: Icon(hasSignature ? Icons.edit : Icons.draw, size: 16),
                 label: Text(
-                  hasSignature ? 'Re-Sign' : 'Sign Report',
+                  hasSignature
+                      ? _tr('Re-Firmar', 'Re-Sign', 'Reassinar')
+                      : _tr('Firmar Dictamen', 'Sign Report', 'Assinar'),
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
                 onPressed: _captureSignature,

@@ -23,7 +23,13 @@ class WelcomeLandingScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: StorageService.instance,
       builder: (context, _) {
-        final s = StorageService.instance.strings;
+        final storage = StorageService.instance;
+        final s = storage.strings;
+        final country = storage.normativeCountry;
+        final isMetric = storage.isMetric;
+        final unitLabel = isMetric
+            ? (storage.localeCode.startsWith('en') ? 'Metric' : 'Métrico')
+            : 'Imperial';
 
         return Scaffold(
           backgroundColor: AppTheme.darkBg,
@@ -88,6 +94,52 @@ class WelcomeLandingScreen extends StatelessWidget {
                       fontSize: 15,
                       color: AppTheme.textSecondary,
                       fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+
+                  // Interactive Country / Normative Profile Quick Toggle Pill
+                  Center(
+                    child: InkWell(
+                      key: const Key('btnWelcomeProfileToggle'),
+                      onTap: () {
+                        final next = country == NormativeCountry.mexico
+                            ? NormativeCountry.usa
+                            : NormativeCountry.mexico;
+                        storage.setNormativeCountry(next);
+                      },
+                      borderRadius: BorderRadius.circular(24),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppTheme.darkCard,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: AppTheme.primary.withValues(alpha: 0.45),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(country.flagEmoji, style: const TextStyle(fontSize: 16)),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${country.codeBadge} • $unitLabel',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Icon(
+                              Icons.swap_horiz_rounded,
+                              size: 16,
+                              color: AppTheme.accent,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
 

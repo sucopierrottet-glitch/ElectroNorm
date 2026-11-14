@@ -86,6 +86,9 @@ class _OnboardingDialogState extends State<OnboardingDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final storage = widget.storageService;
+    final isMexico = storage.isMexicoProfile;
+
     return Dialog(
       backgroundColor: AppTheme.darkSurface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -127,9 +130,9 @@ class _OnboardingDialogState extends State<OnboardingDialog> {
             const SizedBox(height: 8),
             Text(
               _tr(
-                'Configura los datos de tu empresa o perfil técnico para tus reportes PDF (puedes cambiarlos cuando quieras en Ajustes).',
-                'Set up your company or technician details for your PDF reports (you can change them anytime in Settings).',
-                'Configure os dados da sua empresa ou perfil técnico para seus relatórios PDF (você pode alterá-los em Ajustes).',
+                'Elige tu norma de cálculo y configura tus datos técnicos para memorias PDF (puedes cambiarlo cuando quieras en Ajustes).',
+                'Select your code standard and set up your technician details for PDF reports (changeable anytime in Settings).',
+                'Escolha sua norma de cálculo e configure seus dados para relatórios PDF.',
               ),
               textAlign: TextAlign.center,
               style: const TextStyle(
@@ -138,7 +141,115 @@ class _OnboardingDialogState extends State<OnboardingDialog> {
                 height: 1.4,
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
+            Text(
+              _tr('PERFIL NORMATIVO', 'CODE STANDARD', 'PERFIL NORMATIVO'),
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: AppTheme.accent,
+                letterSpacing: 1.0,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    key: const Key('onboarding_profile_mexico'),
+                    onTap: () async {
+                      await storage.setNormativeCountry(NormativeCountry.mexico);
+                      if (mounted) setState(() {});
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isMexico
+                            ? AppTheme.primary.withValues(alpha: 0.18)
+                            : AppTheme.darkCard,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isMexico ? AppTheme.primary : AppTheme.darkBorder,
+                          width: isMexico ? 1.5 : 1.0,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          const Text('🇲🇽', style: TextStyle(fontSize: 20)),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'México',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Text(
+                            'NOM-001 • Métrico',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: isMexico ? AppTheme.accent : AppTheme.textSecondary,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: InkWell(
+                    key: const Key('onboarding_profile_usa'),
+                    onTap: () async {
+                      await storage.setNormativeCountry(NormativeCountry.usa);
+                      if (mounted) setState(() {});
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: !isMexico
+                            ? AppTheme.primary.withValues(alpha: 0.18)
+                            : AppTheme.darkCard,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: !isMexico ? AppTheme.primary : AppTheme.darkBorder,
+                          width: !isMexico ? 1.5 : 1.0,
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          const Text('🇺🇸', style: TextStyle(fontSize: 20)),
+                          const SizedBox(height: 4),
+                          const Text(
+                            'USA',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                          Text(
+                            'NEC (NFPA 70) • in/ft',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: !isMexico ? AppTheme.accent : AppTheme.textSecondary,
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
             TextField(
               controller: _companyCtrl,
               style: const TextStyle(color: Colors.white),
@@ -156,11 +267,17 @@ class _OnboardingDialogState extends State<OnboardingDialog> {
               controller: _agencyCtrl,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                labelText: _tr(
-                  'Especialidad / Organismo (Ej: Ingeniería Eléctrica, NEC)',
-                  'Specialty / Bureau (e.g. Electrical Engineering, AHJ)',
-                  'Especialidade / Órgão (Ex: Engenharia Elétrica, CREA)',
-                ),
+                labelText: isMexico
+                    ? _tr(
+                        'UVIE / Organismo Verificador (Opcional)',
+                        'UVIE / Inspection Agency (Optional)',
+                        'Órgão Verificador (Opcional)',
+                      )
+                    : _tr(
+                        'Especialidad / Organismo (Ej: Ingeniería Eléctrica, AHJ)',
+                        'Specialty / Bureau (e.g. Electrical Engineering, AHJ)',
+                        'Especialidade / Órgão (Ex: Engenharia Elétrica, CREA)',
+                      ),
                 prefixIcon: const Icon(Icons.work_outline_rounded, color: AppTheme.textSecondary),
               ),
             ),
@@ -182,11 +299,17 @@ class _OnboardingDialogState extends State<OnboardingDialog> {
               controller: _licenseCtrl,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                labelText: _tr(
-                  'Matrícula / Licencia Profesional (Opcional)',
-                  'Professional License # (Optional)',
-                  'Registro Profissional / CREA (Opcional)',
-                ),
+                labelText: isMexico
+                    ? _tr(
+                        'Cédula Profesional / Registro UVIE (Opcional)',
+                        'Professional License / UVIE ID (Optional)',
+                        'Registro Profissional (Opcional)',
+                      )
+                    : _tr(
+                        'Matrícula / Licencia Profesional (Opcional)',
+                        'Professional License # (Optional)',
+                        'Registro Profissional / CREA (Opcional)',
+                      ),
                 prefixIcon: const Icon(Icons.badge_outlined, color: AppTheme.textSecondary),
               ),
             ),

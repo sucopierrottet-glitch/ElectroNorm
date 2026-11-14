@@ -75,6 +75,13 @@ class AppStrings {
   final String pdfInspectorHeader;
   final String pdfCalculationsHeader;
 
+  // Country & Normative Profiles
+  final String normativeProfileHeader;
+  final String normativeProfileSubtitle;
+  final String unitsHeader;
+  final String unitsMetricLabel;
+  final String unitsImperialLabel;
+
   const AppStrings({
     required this.appTitle,
     required this.appSubtitle,
@@ -138,6 +145,11 @@ class AppStrings {
     required this.pdfGeneratedDate,
     required this.pdfInspectorHeader,
     required this.pdfCalculationsHeader,
+    required this.normativeProfileHeader,
+    required this.normativeProfileSubtitle,
+    required this.unitsHeader,
+    required this.unitsMetricLabel,
+    required this.unitsImperialLabel,
   });
 
   // ==========================================
@@ -145,7 +157,7 @@ class AppStrings {
   // ==========================================
   static const es = AppStrings(
     appTitle: 'ELECTRONORM',
-    appSubtitle: 'Cálculos Eléctricos & Reportes NEC',
+    appSubtitle: 'Cálculos Eléctricos NOM-001 & NEC',
     cancel: 'Cancelar',
     save: 'Guardar',
     delete: 'Eliminar',
@@ -175,9 +187,9 @@ class AppStrings {
     saveSettingsBtn: 'Guardar Ajustes y Perfil',
     settingsSavedSuccess: 'Ajustes guardados correctamente',
     technicalStandardsHeader: 'NORMAS TÉCNICAS APLICADAS',
-    technicalStandardsDesc: 'Cálculos ejecutados conforme a NEC (NFPA 70), NOM-001-SEDE, RETIE y NBR 5410.',
+    technicalStandardsDesc: 'Cálculos ejecutados conforme a NOM-001-SEDE (México) y NEC NFPA 70 (EE. UU.).',
     appInfoTitle: 'INFORMACIÓN DE LA APLICACIÓN',
-    appVersion: 'ElectroNorm Pro v1.1.0 (SimpleApps PG)',
+    appVersion: 'ElectroNorm Pro v1.2.7 (SimpleApps PG)',
     privacyPolicyBtn: 'Política de Privacidad',
     termsBtn: 'Términos de Servicio',
     proActiveTitle: 'Suscripción Pro Activa',
@@ -206,6 +218,11 @@ class AppStrings {
     pdfGeneratedDate: 'Fecha de Emisión',
     pdfInspectorHeader: 'DATOS DEL TÉCNICO Y AUTORIDAD COMPETENTE',
     pdfCalculationsHeader: 'ANÁLISIS DE OCUPACIÓN Y PARÁMETROS TÉCNICOS',
+    normativeProfileHeader: 'PERFIL NORMATIVO / PAÍS',
+    normativeProfileSubtitle: 'Adapta norma (NOM-001 vs NEC), tensiones estándar y citas de artículos.',
+    unitsHeader: 'SISTEMA DE UNIDADES',
+    unitsMetricLabel: 'Métrico (m, mm², DN)',
+    unitsImperialLabel: 'Imperial (ft, in², ")',
   );
 
   // ==========================================
@@ -213,7 +230,7 @@ class AppStrings {
   // ==========================================
   static const en = AppStrings(
     appTitle: 'ELECTRONORM',
-    appSubtitle: 'Electrical Calculations & NEC Reports',
+    appSubtitle: 'Electrical Calculations NOM-001 & NEC',
     cancel: 'Cancel',
     save: 'Save',
     delete: 'Delete',
@@ -243,9 +260,9 @@ class AppStrings {
     saveSettingsBtn: 'Save Settings & Profile',
     settingsSavedSuccess: 'Settings saved successfully',
     technicalStandardsHeader: 'APPLICABLE TECHNICAL CODES',
-    technicalStandardsDesc: 'Calculations performed pursuant to NEC (NFPA 70), NOM-001, RETIE, and NBR 5410.',
+    technicalStandardsDesc: 'Calculations performed pursuant to NEC (NFPA 70) (USA) and NOM-001-SEDE (Mexico).',
     appInfoTitle: 'APPLICATION INFORMATION',
-    appVersion: 'ElectroNorm Pro v1.1.0 (SimpleApps PG)',
+    appVersion: 'ElectroNorm Pro v1.2.7 (SimpleApps PG)',
     privacyPolicyBtn: 'Privacy Policy',
     termsBtn: 'Terms of Service',
     proActiveTitle: 'Pro Subscription Active',
@@ -274,6 +291,11 @@ class AppStrings {
     pdfGeneratedDate: 'Date of Issue',
     pdfInspectorHeader: 'ENGINEERING & INSPECTION AUTHORITY DATA',
     pdfCalculationsHeader: 'CONDUIT FILL & CODE PARAMETERS ANALYSIS',
+    normativeProfileHeader: 'NORMATIVE CODE PROFILE / COUNTRY',
+    normativeProfileSubtitle: 'Adapts standard (NOM-001 vs NEC), voltages, and code citations.',
+    unitsHeader: 'MEASUREMENT UNITS',
+    unitsMetricLabel: 'Metric (m, mm², DN)',
+    unitsImperialLabel: 'Imperial (ft, in², ")',
   );
 
   // ==========================================
@@ -281,7 +303,7 @@ class AppStrings {
   // ==========================================
   static const pt = AppStrings(
     appTitle: 'ELECTRONORM',
-    appSubtitle: 'Cálculos Elétricos & Relatórios Técnicos',
+    appSubtitle: 'Cálculos Elétricos NOM-001 & NEC',
     cancel: 'Cancelar',
     save: 'Salvar',
     delete: 'Excluir',
@@ -311,9 +333,9 @@ class AppStrings {
     saveSettingsBtn: 'Salvar Ajustes e Perfil',
     settingsSavedSuccess: 'Ajustes salvos com sucesso',
     technicalStandardsHeader: 'NORMAS TÉCNICAS APLICADAS',
-    technicalStandardsDesc: 'Cálculos executados conforme NBR 5410, NEC (NFPA 70), NOM e RETIE.',
+    technicalStandardsDesc: 'Cálculos executados conforme NOM-001-SEDE (México), NEC (NFPA 70) e NBR 5410.',
     appInfoTitle: 'INFORMAÇÕES DO APLICATIVO',
-    appVersion: 'ElectroNorm Pro v1.1.0 (SimpleApps PG)',
+    appVersion: 'ElectroNorm Pro v1.2.7 (SimpleApps PG)',
     privacyPolicyBtn: 'Política de Privacidade',
     termsBtn: 'Termos de Serviço',
     proActiveTitle: 'Assinatura Pro Ativa',
@@ -342,6 +364,11 @@ class AppStrings {
     pdfGeneratedDate: 'Data de Emissão',
     pdfInspectorHeader: 'DADOS DO RESPONSÁVEL TÉCNICO E INSPEÇÃO',
     pdfCalculationsHeader: 'ANÁLISE DE OCUPAÇÃO E PARÂMETROS NORMATIVOS',
+    normativeProfileHeader: 'PERFIL NORMATIVO / PAÍS',
+    normativeProfileSubtitle: 'Adapta a norma (NOM-001 vs NEC), tensões e citações técnicas.',
+    unitsHeader: 'SISTEMA DE UNIDADES',
+    unitsMetricLabel: 'Métrico (m, mm², DN)',
+    unitsImperialLabel: 'Imperial (ft, in², ")',
   );
 
   static AppStrings get(String localeCode) {

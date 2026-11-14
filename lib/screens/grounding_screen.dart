@@ -59,53 +59,70 @@ class _GroundingScreenState extends State<GroundingScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bgDark,
-      appBar: AppBar(
-        title: Text(
-          _tr('Puesta a Tierra NEC 250', 'Grounding & Bonding NEC 250',
-              'Aterramento NEC 250'),
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        backgroundColor: AppColors.surfaceElevated,
-        elevation: 0,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: AppColors.compliant,
-          indicatorWeight: 3,
-          labelColor: AppColors.compliant,
-          unselectedLabelColor: AppColors.textSecondary,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-          tabs: [
-            Tab(
-              icon: const Icon(Icons.shield_outlined, size: 20),
-              text: _tr('EGC (Equipos 250.122)', 'EGC (Equipment 250.122)',
-                  'EGC (Equipamentos)'),
+    return ListenableBuilder(
+      listenable: StorageService.instance,
+      builder: (context, _) {
+        final storage = StorageService.instance;
+        final isMexico = storage.isMexicoProfile;
+        final isMetric = storage.isMetric;
+
+        return Scaffold(
+          backgroundColor: AppColors.bgDark,
+          appBar: AppBar(
+            title: Text(
+              isMexico
+                  ? _tr('Puesta a Tierra NOM-001 Art. 250', 'Grounding NOM-001 Art. 250',
+                      'Aterramento NOM-001')
+                  : _tr('Puesta a Tierra NEC 250', 'Grounding & Bonding NEC 250',
+                      'Aterramento NEC 250'),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
-            Tab(
-              icon: const Icon(Icons.flash_on_rounded, size: 20),
-              text: _tr('GEC (Electrodo 250.66)', 'GEC (Electrode 250.66)',
-                  'GEC (Eletrodo)'),
+            backgroundColor: AppColors.surfaceElevated,
+            elevation: 0,
+            bottom: TabBar(
+              controller: _tabController,
+              indicatorColor: AppColors.compliant,
+              indicatorWeight: 3,
+              labelColor: AppColors.compliant,
+              unselectedLabelColor: AppColors.textSecondary,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+              tabs: [
+                Tab(
+                  icon: const Icon(Icons.shield_outlined, size: 20),
+                  text: isMexico
+                      ? _tr('EGC (Tabla 250-122)', 'EGC (Table 250-122)', 'EGC (Equipamentos)')
+                      : _tr('EGC (Equipos 250.122)', 'EGC (Equipment 250.122)',
+                          'EGC (Equipamentos)'),
+                ),
+                Tab(
+                  icon: const Icon(Icons.flash_on_rounded, size: 20),
+                  text: isMexico
+                      ? _tr('GEC (Tabla 250-66)', 'GEC (Table 250-66)', 'GEC (Eletrodo)')
+                      : _tr('GEC (Electrodo 250.66)', 'GEC (Electrode 250.66)',
+                          'GEC (Eletrodo)'),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildEgcTab(),
-          _buildGecTab(),
-        ],
-      ),
+          ),
+          body: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildEgcTab(isMexico: isMexico, isMetric: isMetric),
+              _buildGecTab(isMexico: isMexico, isMetric: isMetric),
+            ],
+          ),
+        );
+      },
     );
   }
 
-  // ================= EGC TAB (NEC 250.122) =================
-  Widget _buildEgcTab() {
+  // ================= EGC TAB (NEC 250.122 / NOM 250-122) =================
+  Widget _buildEgcTab({required bool isMexico, required bool isMetric}) {
     final egcResult = GroundingCalculator.calculateEGC(
       ocpdRating: _selectedOcpd,
       standardPhase: _enableVoltageDropUpsize ? _stdPhaseConductor : null,
       upsizedPhase: _enableVoltageDropUpsize ? _upsizedPhaseConductor : null,
+      isMexico: isMexico,
     );
 
     return SingleChildScrollView(
@@ -149,11 +166,17 @@ class _GroundingScreenState extends State<GroundingScreen>
                     contentPadding: EdgeInsets.zero,
                     activeColor: AppColors.compliant,
                     title: Text(
-                      _tr(
-                        '¿Conductores de fase sobredimensionados? (NEC 250.122(B))',
-                        'Phase conductors upsized for voltage drop? (NEC 250.122(B))',
-                        'Condutores de fase superdimensionados? (NEC 250.122(B))',
-                      ),
+                      isMexico
+                          ? _tr(
+                              '¿Conductores de fase sobredimensionados? (NOM 250-122(b))',
+                              'Phase conductors upsized for voltage drop? (NOM 250-122(b))',
+                              'Condutores de fase superdimensionados? (NOM 250-122(b))',
+                            )
+                          : _tr(
+                              '¿Conductores de fase sobredimensionados? (NEC 250.122(B))',
+                              'Phase conductors upsized for voltage drop? (NEC 250.122(B))',
+                              'Condutores de fase superdimensionados? (NEC 250.122(B))',
+                            ),
                       style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600),
                     ),
                     subtitle: Text(
@@ -187,7 +210,10 @@ class _GroundingScreenState extends State<GroundingScreen>
                           items: _commonWireGauges.map((g) {
                             return DropdownMenuItem(
                               value: g,
-                              child: Text(g, overflow: TextOverflow.ellipsis),
+                              child: Text(
+                                NormativeFormatters.formatAwgWithMetric(g, isMetric: isMetric),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             );
                           }).toList(),
                           onChanged: (val) {
@@ -209,7 +235,10 @@ class _GroundingScreenState extends State<GroundingScreen>
                           items: _commonWireGauges.map((g) {
                             return DropdownMenuItem(
                               value: g,
-                              child: Text(g, overflow: TextOverflow.ellipsis),
+                              child: Text(
+                                NormativeFormatters.formatAwgWithMetric(g, isMetric: isMetric),
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             );
                           }).toList(),
                           onChanged: (val) {
@@ -234,18 +263,18 @@ class _GroundingScreenState extends State<GroundingScreen>
             children: [
               _buildResultRow(
                 _tr('Conductor de Cobre (Cu):', 'Copper Conductor (Cu):', 'Condutor de Cobre:'),
-                egcResult.cuSize,
+                NormativeFormatters.formatAwgWithMetric(egcResult.cuSize, isMetric: isMetric),
                 isHighlight: true,
               ),
               const Divider(color: Colors.white24, height: 16),
               _buildResultRow(
                 _tr('Conductor de Aluminio (Al):', 'Aluminum Conductor (Al):', 'Condutor de Alumínio:'),
-                egcResult.alSize,
+                NormativeFormatters.formatAwgWithMetric(egcResult.alSize, isMetric: isMetric),
                 isHighlight: false,
               ),
               const Divider(color: Colors.white24, height: 16),
               _buildResultRow(
-                _tr('Referencia Normativa:', 'Code Reference:', 'Referência NEC:'),
+                _tr('Referencia Normativa:', 'Code Reference:', 'Referência Normativa:'),
                 egcResult.necReference,
                 isHighlight: false,
               ),
@@ -276,28 +305,41 @@ class _GroundingScreenState extends State<GroundingScreen>
           ],
           const SizedBox(height: 16),
           _buildInstructionBox(
-            _tr(
-              'Regla NEC 250.122:\n'
-              '• El conductor de puesta a tierra de equipos (EGC) protege contra fallas a tierra despegando el interruptor.\n'
-              '• Si se instalan conductores en paralelo en múltiples canalizaciones (NEC 250.122(F)), cada tubería debe llevar un EGC de tamaño completo según la protección del circuito.',
-              'NEC 250.122 Rules:\n'
-              '• The equipment grounding conductor (EGC) bonds conductive metal parts back to source to trip breakers upon fault.\n'
-              '• For parallel conductor runs in multiple raceways (NEC 250.122(F)), a full-sized EGC based on circuit OCPD must be pulled in each raceway.',
-              'Regra NEC 250.122:\nO condutor EGC garante que a corrente de falha atinja o valor suficiente para desarmar a proteção.',
-            ),
+            isMexico
+                ? _tr(
+                    'Regla NOM-001-SEDE 250-122:\n'
+                    '• El conductor de puesta a tierra de equipos (EGC) protege contra fallas a tierra asegurando el disparo de la protección.\n'
+                    '• Si se instalan conductores en paralelo en múltiples canalizaciones (Art. 250-122(f)), cada tubería debe llevar un EGC de calibre completo según el interruptor.',
+                    'NOM-001-SEDE 250-122 Rules:\n'
+                    '• The equipment grounding conductor (EGC) bonds conductive metal parts back to source to trip breakers upon fault.\n'
+                    '• For parallel runs in multiple raceways (250-122(f)), a full-sized EGC based on circuit OCPD must be pulled in each raceway.',
+                    'Regra NOM-001-SEDE 250-122:\nO condutor EGC garante que a corrente de falha desarme a proteção.',
+                  )
+                : _tr(
+                    'Regla NEC 250.122:\n'
+                    '• El conductor de puesta a tierra de equipos (EGC) protege contra fallas a tierra despegando el interruptor.\n'
+                    '• Si se instalan conductores en paralelo en múltiples canalizaciones (NEC 250.122(F)), cada tubería debe llevar un EGC de tamaño completo según la protección del circuito.',
+                    'NEC 250.122 Rules:\n'
+                    '• The equipment grounding conductor (EGC) bonds conductive metal parts back to source to trip breakers upon fault.\n'
+                    '• For parallel conductor runs in multiple raceways (NEC 250.122(F)), a full-sized EGC based on circuit OCPD must be pulled in each raceway.',
+                    'Regra NEC 250.122:\nO condutor EGC garante que a corrente de falha atinja o valor suficiente para desarmar a proteção.',
+                  ),
           ),
         ],
       ),
     );
   }
 
-  // ================= GEC TAB (NEC 250.66) =================
-  Widget _buildGecTab() {
+  // ================= GEC TAB (NEC 250.66 / NOM 250-66) =================
+  Widget _buildGecTab({required bool isMexico, required bool isMetric}) {
     final gecResult = GroundingCalculator.calculateGEC(
       serviceSize: _serviceConductorSize,
       serviceMaterial: _serviceMaterial,
       electrodeType: _selectedElectrode,
+      isMexico: isMexico,
     );
+
+    final isEs = !StorageService.instance.localeCode.startsWith('en');
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -328,7 +370,10 @@ class _GroundingScreenState extends State<GroundingScreen>
                         items: _commonWireGauges.map((g) {
                           return DropdownMenuItem(
                             value: g,
-                            child: Text(g, overflow: TextOverflow.ellipsis),
+                            child: Text(
+                              NormativeFormatters.formatAwgWithMetric(g, isMetric: isMetric),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           );
                         }).toList(),
                         onChanged: (val) {
@@ -375,11 +420,10 @@ class _GroundingScreenState extends State<GroundingScreen>
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                   items: ElectrodeType.values.map((e) {
-                    final isEs = StorageService.instance.localeCode.startsWith('es');
                     return DropdownMenuItem(
                       value: e,
                       child: Text(
-                        isEs ? e.nameEs : e.nameEn,
+                        e.localizedName(isSpanish: isEs, isMexico: isMexico),
                         style: const TextStyle(fontSize: 12.5),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -403,18 +447,18 @@ class _GroundingScreenState extends State<GroundingScreen>
             children: [
               _buildResultRow(
                 _tr('Conductor de Cobre (Cu):', 'Copper GEC (Cu):', 'Condutor Cobre GEC:'),
-                gecResult.cuSize,
+                NormativeFormatters.formatAwgWithMetric(gecResult.cuSize, isMetric: isMetric),
                 isHighlight: true,
               ),
               const Divider(color: Colors.white24, height: 16),
               _buildResultRow(
                 _tr('Conductor de Aluminio (Al):', 'Aluminum GEC (Al):', 'Condutor Alumínio GEC:'),
-                gecResult.alSize,
+                NormativeFormatters.formatAwgWithMetric(gecResult.alSize, isMetric: isMetric),
                 isHighlight: false,
               ),
               const Divider(color: Colors.white24, height: 16),
               _buildResultRow(
-                _tr('Norma y Artículos:', 'Code & Section:', 'Artigo NEC:'),
+                _tr('Norma y Artículos:', 'Code & Section:', 'Referência:'),
                 gecResult.necReference,
                 isHighlight: false,
               ),
@@ -445,17 +489,29 @@ class _GroundingScreenState extends State<GroundingScreen>
           ],
           const SizedBox(height: 16),
           _buildInstructionBox(
-            _tr(
-              'Límites Especiales del NEC 250.66:\n'
-              '• 250.66(A): Si se conecta exclusivamente a varilla, tubo o placa, NUNCA se requiere que sea mayor a 6 AWG Cu o 4 AWG Al.\n'
-              '• 250.66(B): Si se conecta a un electrodo embebido en concreto (Ufer ground), el GEC no necesita ser mayor a 4 AWG Cu.\n'
-              '• 250.66(C): Para anillo de tierra, no necesita ser mayor al calibre del propio anillo (mínimo 2 AWG Cu).',
-              'Special NEC 250.66 Maximum Caps:\n'
-              '• 250.66(A): When sole connection is to a rod, pipe, or plate, NEVER required to exceed 6 AWG Cu or 4 AWG Al.\n'
-              '• 250.66(B): For concrete-encased (Ufer) ground, not required to exceed 4 AWG Cu.\n'
-              '• 250.66(C): For ground ring, not required to be larger than ring conductor (min 2 AWG Cu).',
-              'Limitações especiais do NEC 250.66 para hastes, sapatas e anéis de terra.',
-            ),
+            isMexico
+                ? _tr(
+                    'Límites Especiales NOM-001-SEDE 250-66:\n'
+                    '• 250-66(a): Si se conecta exclusivamente a varilla, tubo o placa, NUNCA se requiere mayor a 6 AWG (13.3 mm²) Cu o 4 AWG (21.2 mm²) Al.\n'
+                    '• 250-66(b): Electrodo embebido en concreto (Ufer), máximo requerido 4 AWG (21.2 mm²) Cu.\n'
+                    '• 250-66(c): Anillo de tierra, no mayor al calibre del anillo (mínimo 2 AWG / 33.6 mm² Cu).',
+                    'Special NOM-001-SEDE 250-66 Maximum Caps:\n'
+                    '• 250-66(a): Sole connection to rod, pipe, or plate never needs to exceed 6 AWG (13.3 mm²) Cu or 4 AWG Al.\n'
+                    '• 250-66(b): Concrete-encased (Ufer) ground: max 4 AWG (21.2 mm²) Cu.\n'
+                    '• 250-66(c): Ground ring: no larger than ring conductor (min 2 AWG / 33.6 mm² Cu).',
+                    'Limitações especiais NOM-001-SEDE 250-66.',
+                  )
+                : _tr(
+                    'Límites Especiales del NEC 250.66:\n'
+                    '• 250.66(A): Si se conecta exclusivamente a varilla, tubo o placa, NUNCA se requiere que sea mayor a 6 AWG Cu o 4 AWG Al.\n'
+                    '• 250.66(B): Si se conecta a un electrodo embebido en concreto (Ufer ground), el GEC no necesita ser mayor a 4 AWG Cu.\n'
+                    '• 250.66(C): Para anillo de tierra, no necesita ser mayor al calibre del propio anillo (mínimo 2 AWG Cu).',
+                    'Special NEC 250.66 Maximum Caps:\n'
+                    '• 250.66(A): When sole connection is to a rod, pipe, or plate, NEVER required to exceed 6 AWG Cu or 4 AWG Al.\n'
+                    '• 250.66(B): For concrete-encased (Ufer) ground, not required to exceed 4 AWG Cu.\n'
+                    '• 250.66(C): For ground ring, not required to be larger than ring conductor (min 2 AWG Cu).',
+                    'Limitações especiais do NEC 250.66 para hastes, sapatas e anéis de terra.',
+                  ),
           ),
         ],
       ),

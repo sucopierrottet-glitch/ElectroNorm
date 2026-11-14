@@ -245,7 +245,9 @@ class _HomeNavigationScreenState extends State<HomeNavigationScreen> {
                       index: 2,
                       icon: Icons.inventory_2_outlined,
                       activeIcon: Icons.inventory_2_rounded,
-                      label: _tr('Catálogo NEC', 'NEC Catalog', 'Catálogo NEC'),
+                      label: StorageService.instance.isMexicoProfile
+                          ? _tr('Catálogo NOM', 'NOM-001 Catalog', 'Catálogo NOM')
+                          : _tr('Catálogo NEC', 'NEC Catalog', 'Catálogo NEC'),
                     ),
                     _buildNavItem(
                       index: 3,

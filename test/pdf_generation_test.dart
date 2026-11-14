@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:printing/printing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:electronorm/calculators/conduit_fill_calculator.dart';
 import 'package:electronorm/calculators/derating_calculator.dart';
@@ -16,6 +17,7 @@ import 'package:electronorm/models/raceway.dart';
 import 'package:electronorm/screens/calculator_screen.dart';
 import 'package:electronorm/screens/report_preview_screen.dart';
 import 'package:electronorm/services/pdf_report_service.dart';
+import 'package:electronorm/services/storage_service.dart';
 import 'package:electronorm/theme/app_theme.dart';
 import 'package:electronorm/widgets/signature_dialog.dart';
 
@@ -338,6 +340,13 @@ void main() {
   });
 
   group('Milestone 3: Digital Signature Pad Widget Tests', () {
+    setUp(() async {
+      SharedPreferences.setMockInitialValues({});
+      StorageService.instance = SharedPreferencesStorageService();
+      await StorageService.instance.setLocale('en');
+      await StorageService.instance.setNormativeCountry(NormativeCountry.usa);
+    });
+
     testWidgets('Renders SignatureDialog with pad and action buttons', (tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -421,7 +430,12 @@ void main() {
   group('Milestone 3: Report Preview Screen & Calculator Screen Integration', () {
     late ComplianceReportData sampleData;
 
-    setUp(() {
+    setUp(() async {
+      SharedPreferences.setMockInitialValues({});
+      StorageService.instance = SharedPreferencesStorageService();
+      await StorageService.instance.setLocale('en');
+      await StorageService.instance.setNormativeCountry(NormativeCountry.usa);
+
       final emt = RacewayCatalog.getProfile(RacewayType.emt, '3/4');
       final spec10 = ConductorCatalog.getSpec(gauge: '10 AWG');
       final groups = [

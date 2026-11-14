@@ -38,14 +38,15 @@ void main() {
     await tester.tap(find.byKey(const Key('btnWelcomeEnter')));
     await tester.pumpAndSettle();
 
-    // Verify HomeNavigationScreen & CalculatorScreen are mounted and start empty
+    // Verify HomeNavigationScreen & CalculatorScreen are mounted and start empty (Spanish/Mexico default)
     expect(find.byType(HomeNavigationScreen), findsOneWidget);
     expect(find.byType(CalculatorScreen), findsOneWidget);
-    expect(find.text('0 conductors packed'), findsOneWidget);
+    expect(find.text('0 conductores'), findsOneWidget);
+    expect(find.byKey(const Key('btnCalculatorProfileBanner')), findsOneWidget);
 
     // Progressive disclosure: advanced modules are hidden initially in user flow
-    expect(find.text('Live Voltage Drop'), findsNothing);
-    expect(find.text('Live Thermal Derating'), findsNothing);
+    expect(find.text('Caída de Tensión en Vivo'), findsNothing);
+    expect(find.text('Ajuste Térmico y Ampacidad'), findsNothing);
     expect(find.byKey(const Key('btnToggleVoltageDrop')), findsOneWidget);
     expect(find.byKey(const Key('btnToggleThermalDerating')), findsOneWidget);
     expect(find.byKey(const Key('btnToggleQuickPresets')), findsOneWidget);
@@ -53,14 +54,14 @@ void main() {
     // Progressively add Voltage Drop module on demand
     await tester.tap(find.byKey(const Key('btnToggleVoltageDrop')));
     await tester.pumpAndSettle();
-    expect(find.text('Live Voltage Drop'), findsOneWidget);
+    expect(find.text('Caída de Tensión en Vivo'), findsOneWidget);
 
     // Progressively add Thermal Derating module on demand
     await tester.tap(find.byKey(const Key('btnToggleThermalDerating')));
     await tester.pumpAndSettle();
-    expect(find.text('Live Thermal Derating'), findsOneWidget);
+    expect(find.text('Ajuste Térmico y Ampacidad'), findsOneWidget);
 
-    // Navigate bottom tabs (FieldQuote layout: 0=Calculadora, 1=Proyectos, 2=Catálogo NEC, 3=Ajustes)
+    // Navigate bottom tabs (FieldQuote layout: 0=Calculadora, 1=Proyectos, 2=Catálogo NOM, 3=Ajustes)
     await tester.tap(find.byKey(const Key('navTab_1')));
     await tester.pumpAndSettle();
     expect(find.byType(SavedProjectsScreen), findsOneWidget);
@@ -72,6 +73,7 @@ void main() {
     await tester.tap(find.byKey(const Key('navTab_3')));
     await tester.pumpAndSettle();
     expect(find.byType(SettingsScreen), findsOneWidget);
+    expect(find.text('PERFIL NORMATIVO / PAÍS'), findsOneWidget);
     expect(find.text('IDIOMA / LANGUAGE'), findsOneWidget);
     expect(find.text('FIRMA DIGITAL PREDETERMINADA'), findsOneWidget);
     expect(find.text('COMUNIDAD Y OPINIONES'), findsOneWidget);

@@ -174,9 +174,9 @@ class ProUpsellDialog extends StatelessWidget {
               Icons.draw_rounded,
               const Color(0xFF8B5CF6),
               _tr(
-                'Firma digital pericial, caída de tensión y derating NEC',
-                'Digital inspector signature, voltage drop & NEC derating',
-                'Assinatura digital técnica, queda de tensão e derating NEC',
+                'Firma digital pericial, caída de tensión y derating ${storageService.normativeCountry.shortCode}',
+                'Digital inspector signature, voltage drop & ${storageService.normativeCountry.shortCode} derating',
+                'Assinatura digital técnica, queda de tensão e derating ${storageService.normativeCountry.shortCode}',
               ),
             ),
             const SizedBox(height: 22),

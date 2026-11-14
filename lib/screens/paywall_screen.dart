@@ -250,14 +250,18 @@ class _PaywallScreenState extends State<PaywallScreen> {
           borderRadius: BorderRadius.circular(16),
           side: const BorderSide(color: AppColors.caution, width: 1.5),
         ),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.stars, color: AppColors.caution, size: 28),
-            SizedBox(width: 8),
+            const Icon(Icons.stars, color: AppColors.caution, size: 28),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'Wait! Unlock 7 Days Free',
-                style: TextStyle(
+                _tr(
+                  '¡Espera! Desbloquea 7 Días Gratis',
+                  'Wait! Unlock 7 Days Free',
+                  'Espere! Libere 7 Dias Grátis',
+                ),
+                style: const TextStyle(
                   color: AppColors.textPrimary,
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
@@ -266,17 +270,22 @@ class _PaywallScreenState extends State<PaywallScreen> {
             ),
           ],
         ),
-        content: const Text(
-          'Don\'t leave empty-handed. Try ElectroNorm Pro free for 7 days with zero commitment. Generate inspection-ready signed technical compliance reports on your job site.',
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
+        content: Text(
+          _tr(
+            'Prueba ElectroNorm Pro gratis por 7 días sin compromiso. Genera memorias técnicas firmadas listas para verificación en obra.',
+            'Don\'t leave empty-handed. Try ElectroNorm Pro free for 7 days with zero commitment. Generate inspection-ready signed technical compliance reports on your job site.',
+            'Experimente o ElectroNorm Pro grátis por 7 dias sem compromisso. Gere relatórios técnicos assinados em campo.',
+          ),
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
         ),
         actions: [
           TextButton(
             key: const Key('btnRescueDismiss'),
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text(
-              'Continue with Free Version',
-              style: TextStyle(color: AppColors.textTertiary),
+            child: Text(
+              _tr('Seguir con Versión Gratis', 'Continue with Free Version',
+                  'Continuar Grátis'),
+              style: const TextStyle(color: AppColors.textTertiary),
             ),
           ),
           ElevatedButton(
@@ -286,9 +295,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
               foregroundColor: Colors.black,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text(
-              'Claim 7-Day Free Trial',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            child: Text(
+              _tr('Activar 7 Días Gratis', 'Claim 7-Day Free Trial', 'Testar 7 Dias Grátis'),
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -326,12 +335,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
     final monthlyProduct = _billingService.monthlyProduct;
     final yearlyProduct = _billingService.yearlyProduct;
     final isBusy = _billingService.isPurchasePending;
+    final country = StorageService.instance.normativeCountry;
 
     final annualPriceText = yearlyProduct != null
-        ? '${yearlyProduct.price}/yr'
+        ? '${yearlyProduct.price}/${_tr("año", "yr", "ano")}'
         : (StorageService.isTestEnvironment ? '\$69.00/yr' : _tr('Consultar precio', 'Check price', 'Consultar preço'));
     final monthlyPriceText = monthlyProduct != null
-        ? '${monthlyProduct.price}/mo'
+        ? '${monthlyProduct.price}/${_tr("mes", "mo", "mês")}'
         : (StorageService.isTestEnvironment ? '\$8.99/mo' : _tr('Consultar precio', 'Check price', 'Consultar preço'));
     final annualPeriodDetail = yearlyProduct != null
         ? _tr('Facturado anualmente • Cancela cuando quieras', 'Billed annually • Cancel anytime', 'Cobrado anualmente • Cancele quando quiser')
@@ -374,9 +384,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
             TextButton(
               key: const Key('btnRestorePaywall'),
               onPressed: isBusy ? null : _restorePurchases,
-              child: const Text(
-                'Restore',
-                style: TextStyle(
+              child: Text(
+                _tr('Restaurar', 'Restore', 'Restaurar'),
+                style: const TextStyle(
                   color: AppColors.textSecondary,
                   fontWeight: FontWeight.w600,
                 ),
@@ -425,8 +435,16 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             const SizedBox(height: 6),
                             Text(
                               _isPro
-                                  ? 'PRO MEMBER (UNLIMITED ACCESS ACTIVE)'
-                                  : 'Professional Electrical Calculations & AHJ Reports',
+                                  ? _tr(
+                                      'MIEMBRO PRO (ACCESO ILIMITADO ACTIVO)',
+                                      'PRO MEMBER (UNLIMITED ACCESS ACTIVE)',
+                                      'MEMBRO PRO (ACESSO ILIMITADO ATIVO)',
+                                    )
+                                  : _tr(
+                                      'Cálculos Eléctricos y Dictámenes ${country.codeBadge}',
+                                      'Professional Electrical Calculations & ${country.inspectionAuthorityShort} Reports',
+                                      'Cálculos Elétricos e Relatórios Técnicos',
+                                    ),
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 13,
@@ -452,26 +470,48 @@ class _PaywallScreenState extends State<PaywallScreen> {
                           children: [
                             _buildFeatureRow(
                               Icons.all_inclusive,
-                              'Unlimited Project Saves',
-                              'Store infinite conduit runs & schedules locally on device',
+                              _tr('Proyectos Guardados Ilimitados', 'Unlimited Project Saves',
+                                  'Projetos Salvos Ilimitados'),
+                              _tr(
+                                'Guarda todos tus tramos y cédulas sin conexión en el dispositivo',
+                                'Store infinite conduit runs & schedules locally on device',
+                                'Armazene infinitos cálculos localmente',
+                              ),
                             ),
                             const Divider(color: AppColors.borderSubtle, height: 20),
                             _buildFeatureRow(
                               Icons.draw_outlined,
-                              'Signed Technical PDF Reports',
-                              'Export formal compliance reports with digital inspector sign-off',
+                              _tr('Memorias PDF Firmadas (${country.shortCode})',
+                                  'Signed Technical PDF Reports',
+                                  'Relatórios PDF Assinados'),
+                              _tr(
+                                'Exporta memorias de cumplimiento con firma digital de verificación',
+                                'Export formal compliance reports with digital inspector sign-off',
+                                'Exporte relatórios formais com assinatura digital',
+                              ),
                             ),
                             const Divider(color: AppColors.borderSubtle, height: 20),
                             _buildFeatureRow(
                               Icons.bolt,
-                              'Voltage Drop & Thermal Derating',
-                              'Full impedance matrix & ambient temperature correction factors',
+                              _tr('Caída de Tensión y Derating Térmico',
+                                  'Voltage Drop & Thermal Derating',
+                                  'Queda de Tensão e Fator Térmico'),
+                              _tr(
+                                'Matriz de impedancia completa y factores por temperatura ambiente',
+                                'Full impedance matrix & ambient temperature correction factors',
+                                'Matriz de impedância e fatores de temperatura',
+                              ),
                             ),
                             const Divider(color: AppColors.borderSubtle, height: 20),
                             _buildFeatureRow(
                               Icons.wifi_off,
-                              '100% Offline Reliability',
-                              'Zero cloud dependencies, zero tracking, zero ads in mechanical rooms',
+                              _tr('100% Confiable Sin Internet', '100% Offline Reliability',
+                                  '100% Confiável Offline'),
+                              _tr(
+                                'Sin dependencia de la nube, sin rastreo, sin anuncios en obra',
+                                'Zero cloud dependencies, zero tracking, zero ads in mechanical rooms',
+                                'Sem nuvem, sem rastreamento, sem anúncios',
+                              ),
                             ),
                           ],
                         ),
@@ -480,28 +520,36 @@ class _PaywallScreenState extends State<PaywallScreen> {
                       const SizedBox(height: 24),
 
                       // Pricing Tiers
-                      // Tier 2: Annual Plan ($69.00/yr with 7-Day Free Trial)
                       _buildTierCard(
                         key: const Key('cardTierAnnual'),
                         tier: PaywallTier.annual,
-                        title: 'Annual Pass',
+                        title: _tr('Pase Anual', 'Annual Pass', 'Passe Anual'),
                         price: annualPriceText,
                         periodDetail: annualPeriodDetail,
-                        badgeText: hasAnnualTrial ? '7-DAY FREE TRIAL' : null,
-                        savingsText: 'BEST VALUE • SAVE 36%',
+                        badgeText: hasAnnualTrial
+                            ? _tr('7 DÍAS GRATIS', '7-DAY FREE TRIAL', '7 DIAS GRÁTIS')
+                            : null,
+                        savingsText:
+                            _tr('MEJOR VALOR • AHORRA 36%', 'BEST VALUE • SAVE 36%', 'ECONOMIZE 36%'),
                         isRecommended: true,
                       ),
 
                       const SizedBox(height: 12),
 
-                      // Tier 1: Monthly Plan ($8.99/mo with 7-Day Free Trial)
                       _buildTierCard(
                         key: const Key('cardTierMonthly'),
                         tier: PaywallTier.monthly,
-                        title: 'Monthly Subscription',
+                        title: _tr('Suscripción Mensual', 'Monthly Subscription',
+                            'Assinatura Mensal'),
                         price: monthlyPriceText,
-                        periodDetail: 'Flexible monthly billing • Cancel anytime',
-                        badgeText: hasMonthlyTrial ? '7-DAY FREE TRIAL' : null,
+                        periodDetail: _tr(
+                          'Cobro mensual flexible • Cancela cuando quieras',
+                          'Flexible monthly billing • Cancel anytime',
+                          'Cobrança mensal • Cancele quando quiser',
+                        ),
+                        badgeText: hasMonthlyTrial
+                            ? _tr('7 DÍAS GRATIS', '7-DAY FREE TRIAL', '7 DIAS GRÁTIS')
+                            : null,
                         savingsText: null,
                         isRecommended: false,
                       ),
@@ -534,10 +582,11 @@ class _PaywallScreenState extends State<PaywallScreen> {
                                 )
                               : Text(
                                   selectedHasTrial
-                                      ? 'Start 7-Day Free Trial'
+                                      ? _tr('Iniciar Prueba Gratis 7 Días',
+                                          'Start 7-Day Free Trial', 'Iniciar 7 Dias Grátis')
                                       : (hasSelectedPrice
-                                          ? 'Subscribe Now — $selectedPriceText'
-                                          : 'Subscribe Now'),
+                                          ? '${_tr("Suscribirse", "Subscribe Now", "Assinar")} — $selectedPriceText'
+                                          : _tr('Suscribirse Ahora', 'Subscribe Now', 'Assinar Agora')),
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -552,11 +601,27 @@ class _PaywallScreenState extends State<PaywallScreen> {
                       Text(
                         selectedHasTrial
                             ? (hasSelectedPrice
-                                ? '7 days free, then $selectedPriceText. Cancel anytime in Google Play.'
-                                : '7 days free, then standard plan rate. Cancel anytime in Google Play.')
+                                ? _tr(
+                                    '7 días gratis, luego $selectedPriceText. Cancela en cualquier momento en Google Play.',
+                                    '7 days free, then $selectedPriceText. Cancel anytime in Google Play.',
+                                    '7 dias grátis, depois $selectedPriceText. Cancele no Google Play.',
+                                  )
+                                : _tr(
+                                    '7 días gratis, luego tarifa estándar. Cancela cuando quieras en Google Play.',
+                                    '7 days free, then standard plan rate. Cancel anytime in Google Play.',
+                                    '7 dias grátis, depois tarifa padrão. Cancele no Google Play.',
+                                  ))
                             : (hasSelectedPrice
-                                ? 'Recurring billing ($selectedPriceText). Cancel anytime in Google Play.'
-                                : 'Recurring billing. Cancel anytime in Google Play.'),
+                                ? _tr(
+                                    'Cobro recurrente ($selectedPriceText). Cancela en cualquier momento en Google Play.',
+                                    'Recurring billing ($selectedPriceText). Cancel anytime in Google Play.',
+                                    'Cobrança recorrente ($selectedPriceText). Cancele no Google Play.',
+                                  )
+                                : _tr(
+                                    'Cobro recurrente. Cancela en cualquier momento en Google Play.',
+                                    'Recurring billing. Cancel anytime in Google Play.',
+                                    'Cobrança recorrente. Cancele no Google Play.',
+                                  )),
                         textAlign: TextAlign.center,
                         style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
                       ),
@@ -572,9 +637,10 @@ class _PaywallScreenState extends State<PaywallScreen> {
                         children: [
                           GestureDetector(
                             onTap: _openPrivacyPolicy,
-                            child: const Text(
-                              'Privacy Policy',
-                              style: TextStyle(
+                            child: Text(
+                              _tr('Política de Privacidad', 'Privacy Policy',
+                                  'Política de Privacidade'),
+                              style: const TextStyle(
                                 fontSize: 11,
                                 color: AppColors.textSecondary,
                                 decoration: TextDecoration.underline,
@@ -584,9 +650,9 @@ class _PaywallScreenState extends State<PaywallScreen> {
                           const Text('•', style: TextStyle(color: AppColors.textTertiary, fontSize: 11)),
                           GestureDetector(
                             onTap: _openPrivacyPolicy,
-                            child: const Text(
-                              'Terms of Service',
-                              style: TextStyle(
+                            child: Text(
+                              _tr('Términos de Servicio', 'Terms of Service', 'Termos de Serviço'),
+                              style: const TextStyle(
                                 fontSize: 11,
                                 color: AppColors.textSecondary,
                                 decoration: TextDecoration.underline,
@@ -736,15 +802,21 @@ class _PaywallScreenState extends State<PaywallScreen> {
                     style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
                   ),
                 ),
-                if (savingsText != null)
-                  Text(
-                    savingsText,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.caution,
+                if (savingsText != null) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      savingsText,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.caution,
+                      ),
                     ),
                   ),
+                ],
               ],
             ),
           ],
