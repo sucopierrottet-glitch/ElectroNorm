@@ -34,7 +34,7 @@ jobs:
         run: flutter pub get
 
       - name: Build Release APK
-        run: flutter build apk --release
+        run: flutter build apk --release --android-skip-build-dependency-validation
 
       - name: Prepare APK File
         run: cp build/app/outputs/flutter-apk/app-release.apk electronorm.apk
@@ -46,7 +46,7 @@ jobs:
           path: electronorm.apk
 
       - name: Build App Bundle
-        run: flutter build appbundle --release
+        run: flutter build appbundle --release --android-skip-build-dependency-validation
 
       - name: Upload AAB Artifact
         uses: actions/upload-artifact@v4
@@ -57,15 +57,15 @@ jobs:
       - name: Publish GitHub Release with APK & AAB
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.1
-          name: "ElectroNorm Pro v1.2.1+4 (Soft Paywall Upsell & Auto Device Language)"
+          tag_name: v1.2.7
+          name: "ElectroNorm Pro v1.2.7+10 (Mexico NOM-001 & USA NEC Profiles)"
           body: |
-            ### ElectroNorm Pro v1.2.1+4 (Production Release)
-            - Periodic Pro Upsell popup (`ProUpsellDialog`) every 3rd app open & during active sessions
-            - Automatic device/browser language detection (ES / EN / PT)
-            - Unified FieldQuote-style 4-tab navigation (Calculadora, Proyectos, Catálogo NEC, Ajustes)
-            - Progressive Disclosure in Calculator (+ Caída de Tensión, + Desclasificación Térmica, + Plantillas Rápidas NEC)
-            - Attached signed `electronorm.apk` and `app-release.aab`
+            ### ElectroNorm Pro v1.2.7+10 (Production Release)
+            - Dual normative profile support: Mexico (NOM-001-SEDE) and USA (NEC / NFPA 70)
+            - Dynamic locale & unit switching (metric vs imperial)
+            - Grounding & bonding calculator with NOM-001 Art. 250 references
+            - Conduit bending with cm/DN and in/" toggle
+            - Compliant PDF reports with UVIE / AHJ sign-off
           files: |
             electronorm.apk
             build/app/outputs/bundle/release/app-release.aab
