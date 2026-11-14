@@ -57,10 +57,10 @@ jobs:
       - name: Publish GitHub Release with APK & AAB
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.2.7
-          name: "ElectroNorm Pro v1.2.7+10 (Mexico NOM-001 & USA NEC Profiles)"
+          tag_name: v1.2.8
+          name: "ElectroNorm Pro v1.2.8+11 (Mexico NOM-001 & USA NEC Profiles)"
           body: |
-            ### ElectroNorm Pro v1.2.7+10 (Production Release)
+            ### ElectroNorm Pro v1.2.8+11 (Production Release)
             - Dual normative profile support: Mexico (NOM-001-SEDE) and USA (NEC / NFPA 70)
             - Dynamic locale & unit switching (metric vs imperial)
             - Grounding & bonding calculator with NOM-001 Art. 250 references
