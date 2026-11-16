@@ -55,3 +55,7 @@ android/key.properties
 *.jks
 *.keystore
 
+# Generated Store & Marketing Assets
+generate_english_assets.py
+store_assets/en/
+
