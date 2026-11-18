@@ -598,6 +598,10 @@ void main() {
         fillResult: fillRes,
       );
 
+      // Exhaust 2-hour free access window so mandatory Paywall gate triggers
+      await storage.recordActiveUsageSeconds(StorageService.maxFreeUsageSeconds);
+      expect(storage.hasFullAccess, isFalse);
+
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.darkTheme,
@@ -606,27 +610,19 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Free tier user taps share button -> triggers paywall
+      // Expired user taps share button -> triggers mandatory paywall gate
       await tester.tap(find.byIcon(Icons.share_outlined));
       await tester.pumpAndSettle();
 
       expect(find.byType(PaywallScreen), findsOneWidget);
       expect(find.text('ElectroNorm Pro'), findsOneWidget);
+      expect(find.byIcon(Icons.close), findsNothing);
 
-      // User attempts to close paywall -> exit-intent rescue dialog triggered
-      await tester.tap(find.byIcon(Icons.close));
-      await tester.pumpAndSettle();
-
-      expect(find.byKey(const Key('dialogRescue')), findsOneWidget);
-      expect(find.text('Wait! Unlock 7 Days Free'), findsOneWidget);
-
-      // User claims 7-day free trial
-      await tester.tap(find.byKey(const Key('btnRescueClaimTrial')));
-      await tester.pumpAndSettle();
-
-      // Pro subscription and trial are now genuinely active in storage
+      // Activating 7-day trial unlocks Pro access cleanly
+      await storage.startTrial();
       expect(await storage.isProSubscriber(), isTrue);
       expect(await storage.isTrialActive(), isTrue);
+      expect(storage.hasFullAccess, isTrue);
     });
   });
 

@@ -890,7 +890,11 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
     });
 
-    testWidgets('2. Export and Share actions prompt PaywallScreen when user is not Pro', (tester) async {
+    testWidgets('2. Export and Share actions prompt PaywallScreen when 2-hour free access expired and user is not Pro', (tester) async {
+      // Exhaust 2-hour active free window so user enters mandatory Stage 2 gate
+      await storageService.recordActiveUsageSeconds(StorageService.maxFreeUsageSeconds);
+      expect(storageService.hasFullAccess, isFalse);
+
       final sample = createSampleCalculation();
       final reportData = ComplianceReportData(
         projectTitle: sample.title,
@@ -918,9 +922,79 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
 
-      // Paywall screen is prompted
+      // Mandatory Paywall gate is prompted without close button
       expect(find.byType(PaywallScreen), findsOneWidget);
       expect(find.text('ElectroNorm Pro'), findsOneWidget);
+      expect(find.byIcon(Icons.close), findsNothing);
+    });
+
+    test('3. 3-Stage Monetization Funnel: 2h free access -> mandatory Play trial -> paid-only stage', () async {
+      expect(StorageService.maxFreeUsageSeconds, equals(7200));
+      expect(storageService.freeSecondsRemaining, equals(7200));
+      expect(storageService.formattedFreeTimeRemaining, equals('2h 00m'));
+      expect(storageService.isFreeWindowActive, isTrue);
+      expect(storageService.needsTrialActivation, isFalse);
+      expect(storageService.hasFullAccess, isTrue);
+      expect(await storageService.canCreateProject(), isTrue);
+
+      // After 1 hour of active foreground usage, 1 hour remains with full PRO access
+      await storageService.recordActiveUsageSeconds(3600);
+      expect(storageService.freeSecondsRemaining, equals(3600));
+      expect(storageService.formattedFreeTimeRemaining, equals('1h 00m'));
+      expect(storageService.isFreeWindowActive, isTrue);
+      expect(storageService.hasFullAccess, isTrue);
+
+      // After 2 hours total, Stage 1 ends and Stage 2 (Trial Activation) is required
+      await storageService.recordActiveUsageSeconds(3600);
+      expect(storageService.freeSecondsRemaining, equals(0));
+      expect(storageService.isFreeWindowActive, isFalse);
+      expect(storageService.needsTrialActivation, isTrue);
+      expect(storageService.hasFullAccess, isFalse);
+      expect(await storageService.canCreateProject(), isFalse);
+
+      // Activating 7-day trial unlocks Stage 2
+      await storageService.activateSevenDayFreeTrial();
+      expect(storageService.isSevenDayTrialActive, isTrue);
+      expect(storageService.hasFullAccess, isTrue);
+      expect(storageService.trialDaysRemainingSync, equals(7));
+
+      // Expiring Google subscription transitions to Stage 3 (Paid-Only)
+      await storageService.markGoogleSubscriptionExpired();
+      expect(storageService.isPaidOnlyStage, isTrue);
+      expect(storageService.hasFullAccess, isFalse);
+
+      // In Stage 3, BillingService skips free-trial offer and selects paid base plan
+      final billing = BillingService(storageService: storageService);
+      billing.indexProductDetails([
+        ProductDetails(
+          id: BillingService.monthlyProductId,
+          title: 'Monthly Trial',
+          description: '7-day free trial',
+          price: 'Free',
+          rawPrice: 0.0,
+          currencyCode: 'USD',
+        ),
+        ProductDetails(
+          id: BillingService.monthlyProductId,
+          title: 'Monthly Base',
+          description: 'Monthly base plan',
+          price: '\$8.99',
+          rawPrice: 8.99,
+          currencyCode: 'USD',
+        ),
+      ]);
+      final chosen = billing.selectPurchaseProduct(
+        isYearly: false,
+        preferFreeTrial: true,
+      );
+      expect(chosen?.rawPrice, equals(8.99));
+
+      // Upgrading to PRO via Google Play unlocks permanent access
+      await storageService.setProSubscriber(true, fromGooglePlay: true);
+      expect(storageService.isProSync, isTrue);
+      expect(storageService.hadGoogleSubscription, isTrue);
+      expect(storageService.hasFullAccess, isTrue);
+      expect(storageService.isPaidOnlyStage, isFalse);
     });
   });
 

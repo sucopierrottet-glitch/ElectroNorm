@@ -414,7 +414,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                       ? (_isTrial
                                           ? '${s.trialActiveTitle} ($_remainingTrialDays d)'
                                           : s.proActiveTitle)
-                                      : s.freePlanTitle,
+                                      : (_storage.isSevenDayTrialActive
+                                          ? '${s.trialActiveTitle} (${_storage.trialDaysRemainingSync} d)'
+                                          : s.freePlanTitle),
                                   style: const TextStyle(
                                     fontWeight: FontWeight.w800,
                                     color: Colors.white,
@@ -438,7 +440,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               onPressed: () async {
                                 await Navigator.push(
                                   context,
-                                  MaterialPageRoute(builder: (_) => const PaywallScreen()),
+                                  MaterialPageRoute(
+                                    builder: (_) => PaywallScreen(
+                                      isMandatoryGate: !_storage.hasFullAccess,
+                                    ),
+                                  ),
                                 );
                                 _loadSettings();
                               },

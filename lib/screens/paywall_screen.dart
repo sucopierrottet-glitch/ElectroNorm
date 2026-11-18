@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -9,7 +10,12 @@ import '../theme/app_theme.dart';
 enum PaywallTier { annual, monthly }
 
 class PaywallScreen extends StatefulWidget {
-  const PaywallScreen({super.key});
+  final bool isMandatoryGate;
+
+  const PaywallScreen({
+    super.key,
+    this.isMandatoryGate = false,
+  });
 
   @override
   State<PaywallScreen> createState() => _PaywallScreenState();
@@ -33,7 +39,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
     super.initState();
     _billingService = BillingService(storageService: StorageService.instance);
     _billingService.addListener(_onBillingChanged);
-    _billingService.init();
+    _billingService.init(syncPurchases: false);
     _loadSubscriberStatus();
   }
 
@@ -134,12 +140,112 @@ class _PaywallScreenState extends State<PaywallScreen> {
     }
   }
 
+  bool _shouldShowTrialOffer(StorageService store, {required bool isYearly}) {
+    if (store.isPaidOnlyStage) return false;
+    if (_billingService.isStoreAvailable && !_billingService.isLoadingProducts) {
+      if (_billingService.monthlyProduct != null ||
+          _billingService.yearlyProduct != null) {
+        return _billingService.hasFreeTrialOffer(isYearly: isYearly);
+      }
+    }
+    return !store.hasStartedTrial;
+  }
+
   Future<void> _subscribe() async {
+    final store = StorageService.instance;
+    final isYearly = _selectedTier == PaywallTier.annual;
+    final showTrialOffer = _shouldShowTrialOffer(store, isYearly: isYearly);
+
     final errorCode = await _billingService.buySubscription(
-      isYearly: _selectedTier == PaywallTier.annual,
+      isYearly: isYearly,
+      preferFreeTrial: showTrialOffer,
     );
 
     if (!mounted || errorCode == null) return;
+
+    // En modo debug (ej. Chrome o emulador sin Play Store), permitimos simular
+    // cada paso del embudo sin afectar el binario de producción ni las pruebas.
+    if (kDebugMode &&
+        !StorageService.isTestEnvironment &&
+        (errorCode == 'store_unavailable' || errorCode == 'product_not_found')) {
+      final isTrialStep = showTrialOffer && !store.hasStartedTrial;
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.surfaceCard,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: [
+              const Icon(Icons.bug_report_rounded, color: AppColors.compliant),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isTrialStep
+                      ? _tr(
+                          'Simular Free Trial (Debug)',
+                          'Simulate Free Trial (Debug)',
+                          'Simular Free Trial (Debug)',
+                        )
+                      : _tr(
+                          'Simular Suscripción (Debug)',
+                          'Simulate Subscription (Debug)',
+                          'Simular Assinatura (Debug)',
+                        ),
+                  style: const TextStyle(color: AppColors.textPrimary, fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+          content: Text(
+            isTrialStep
+                ? _tr(
+                    'En producción, Google Play abrirá la hoja de pago exigiendo tarjeta para iniciar el Free Trial de 7 días antes de cobrar.\n\n¿Deseas simular la activación del Free Trial ahora?',
+                    'In production, Google Play will open the payment sheet requiring a card to start the 7-day Free Trial before billing.\n\nSimulate Free Trial activation now?',
+                    'Em produção, o Google Play abrirá a tela de pagamento exigindo cartão para iniciar o Free Trial de 7 dias.\n\nSimular ativação agora?',
+                  )
+                : _tr(
+                    'En producción se abrirá el cobro directo de suscripción pagada en Google Play.\n\n¿Deseas simular el pago PRO ahora?',
+                    'In production Google Play paid subscription billing will open directly.\n\nSimulate paid PRO purchase now?',
+                    'Em produção a cobrança direta no Google Play será aberta.\n\nSimular assinatura paga agora?',
+                  ),
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(
+                _tr('Cerrar', 'Close', 'Fechar'),
+                style: const TextStyle(color: AppColors.textTertiary),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (isTrialStep) {
+                  await store.activateSevenDayFreeTrial();
+                } else {
+                  await store.setProSubscriber(true);
+                }
+                if (ctx.mounted) Navigator.pop(ctx);
+                if (mounted) {
+                  Navigator.pop(context, true);
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.compliant,
+                foregroundColor: Colors.black,
+              ),
+              child: Text(
+                isTrialStep
+                    ? _tr('Activar Trial (Debug)', 'Activate Trial (Debug)', 'Ativar Trial (Debug)')
+                    : _tr('Simular Pago PRO', 'Simulate PRO Payment', 'Simular Pagamento PRO'),
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
 
     String message;
     if (errorCode == 'store_unavailable') {
@@ -332,10 +438,12 @@ class _PaywallScreenState extends State<PaywallScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final store = StorageService.instance;
     final monthlyProduct = _billingService.monthlyProduct;
     final yearlyProduct = _billingService.yearlyProduct;
     final isBusy = _billingService.isPurchasePending;
-    final country = StorageService.instance.normativeCountry;
+    final country = store.normativeCountry;
+    final isGate = widget.isMandatoryGate && !store.hasFullAccess;
 
     final annualPriceText = yearlyProduct != null
         ? '${yearlyProduct.price}/${_tr("año", "yr", "ano")}'
@@ -352,15 +460,65 @@ class _PaywallScreenState extends State<PaywallScreen> {
         _selectedTier == PaywallTier.annual ? annualPriceText : monthlyPriceText;
     final hasSelectedPrice =
         selectedProduct != null || StorageService.isTestEnvironment;
-    final hasAnnualTrial = _billingService.hasFreeTrialOffer(isYearly: true);
-    final hasMonthlyTrial = _billingService.hasFreeTrialOffer(isYearly: false);
+    final hasAnnualTrial = _shouldShowTrialOffer(store, isYearly: true);
+    final hasMonthlyTrial = _shouldShowTrialOffer(store, isYearly: false);
     final selectedHasTrial =
         _selectedTier == PaywallTier.annual ? hasAnnualTrial : hasMonthlyTrial;
+
+    String? stageBadgeText;
+    Color stageBadgeColor = AppColors.compliant;
+    String stageSubtitleText = _isPro
+        ? _tr(
+            'MIEMBRO PRO (ACCESO ILIMITADO ACTIVO)',
+            'PRO MEMBER (UNLIMITED ACCESS ACTIVE)',
+            'MEMBRO PRO (ACESSO ILIMITADO ATIVO)',
+          )
+        : _tr(
+            'Cálculos Eléctricos y Dictámenes ${country.codeBadge}',
+            'Professional Electrical Calculations & ${country.inspectionAuthorityShort} Reports',
+            'Cálculos Elétricos e Relatórios Técnicos',
+          );
+
+    if (!_isPro) {
+      if (store.needsTrialActivation && (hasMonthlyTrial || hasAnnualTrial)) {
+        stageBadgeText = _tr(
+          'Prueba Gratuita de 7 Días Disponible',
+          '7-Day Free Trial Available',
+          'Teste Grátis de 7 Dias Disponível',
+        );
+        stageBadgeColor = AppTheme.primary;
+        stageSubtitleText = _tr(
+          'Activa tu Prueba Gratuita de 7 días en Google Play para continuar (requiere tarjeta; \$0 hoy).',
+          'Start your 7-day Google Play Free Trial to continue (card required; \$0 today).',
+          'Ative seu Free Trial de 7 dias no Google Play para continuar (requer cartão; \$0 hoje).',
+        );
+      } else if (store.isSevenDayTrialActive) {
+        stageBadgeText = _tr(
+          'Free Trial Activo: ${store.trialDaysRemainingSync} días restantes',
+          'Free Trial Active: ${store.trialDaysRemainingSync} days left',
+          'Free Trial Ativo: ${store.trialDaysRemainingSync} dias restantes',
+        );
+        stageBadgeColor = AppTheme.primary;
+      } else if (store.isPaidOnlyStage) {
+        stageBadgeText = _tr(
+          'Prueba Gratuita Finalizada • Solo Suscripción',
+          'Free Trial Ended • Subscription Required',
+          'Teste Gratuito Finalizado • Assinatura Necessária',
+        );
+        stageBadgeColor = Colors.orangeAccent;
+        stageSubtitleText = _tr(
+          'Tu periodo de prueba finalizó. Elige un plan mensual o anual para desbloquear ElectroNorm PRO.',
+          'Your free trial has ended. Choose a monthly or annual plan to unlock ElectroNorm PRO.',
+          'Seu teste gratuito terminou. Escolha um plano mensal ou anual para continuar.',
+        );
+      }
+    }
 
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
+        if (isGate) return;
         final shouldPop = await _handlePopAttempt();
         if (shouldPop && context.mounted) {
           Navigator.of(context).pop(false);
@@ -371,15 +529,18 @@ class _PaywallScreenState extends State<PaywallScreen> {
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.close, color: AppColors.textPrimary),
-            onPressed: () async {
-              final shouldPop = await _handlePopAttempt();
-              if (shouldPop && context.mounted) {
-                Navigator.of(context).pop(false);
-              }
-            },
-          ),
+          automaticallyImplyLeading: !isGate,
+          leading: isGate
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.close, color: AppColors.textPrimary),
+                  onPressed: () async {
+                    final shouldPop = await _handlePopAttempt();
+                    if (shouldPop && context.mounted) {
+                      Navigator.of(context).pop(false);
+                    }
+                  },
+                ),
           actions: [
             TextButton(
               key: const Key('btnRestorePaywall'),
@@ -423,6 +584,31 @@ class _PaywallScreenState extends State<PaywallScreen> {
                               ),
                             ),
                             const SizedBox(height: 12),
+                            if (stageBadgeText != null) ...[
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 5,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: stageBadgeColor.withValues(alpha: 0.14),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: stageBadgeColor.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                child: Text(
+                                  stageBadgeText,
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: stageBadgeColor,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                            ],
                             const Text(
                               'ElectroNorm Pro',
                               style: TextStyle(
@@ -434,17 +620,7 @@ class _PaywallScreenState extends State<PaywallScreen> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              _isPro
-                                  ? _tr(
-                                      'MIEMBRO PRO (ACCESO ILIMITADO ACTIVO)',
-                                      'PRO MEMBER (UNLIMITED ACCESS ACTIVE)',
-                                      'MEMBRO PRO (ACESSO ILIMITADO ATIVO)',
-                                    )
-                                  : _tr(
-                                      'Cálculos Eléctricos y Dictámenes ${country.codeBadge}',
-                                      'Professional Electrical Calculations & ${country.inspectionAuthorityShort} Reports',
-                                      'Cálculos Elétricos e Relatórios Técnicos',
-                                    ),
+                              stageSubtitleText,
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 13,

@@ -4,12 +4,13 @@ import 'package:flutter/services.dart';
 
 import '../models/conductor.dart';
 import '../models/raceway.dart';
+import '../services/billing_service.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/onboarding_dialog.dart';
-import '../widgets/pro_upsell_dialog.dart';
 import 'calculator_screen.dart';
 import 'nec_catalog_screen.dart';
+import 'paywall_screen.dart';
 import 'saved_projects_screen.dart';
 import 'settings_screen.dart';
 
@@ -27,10 +28,13 @@ class HomeNavigationScreen extends StatefulWidget {
   State<HomeNavigationScreen> createState() => _HomeNavigationScreenState();
 }
 
-class _HomeNavigationScreenState extends State<HomeNavigationScreen> {
+class _HomeNavigationScreenState extends State<HomeNavigationScreen>
+    with WidgetsBindingObserver {
   late int _currentIndex;
-  bool _upsellShownThisSession = false;
-  Timer? _usageUpsellTimer;
+  Timer? _usageTimer;
+  bool _isGateOpen = false;
+  bool _isForeground = true;
+  late final BillingService _billingSyncService;
 
   final GlobalKey<CalculatorScreenState> _calculatorKey =
       GlobalKey<CalculatorScreenState>();
@@ -46,6 +50,20 @@ class _HomeNavigationScreenState extends State<HomeNavigationScreen> {
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    WidgetsBinding.instance.addObserver(this);
+
+    _billingSyncService = BillingService(storageService: StorageService.instance);
+    if (!StorageService.isTestEnvironment) {
+      _billingSyncService.init(syncPurchases: true);
+
+      _usageTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+        if (!_isForeground) return;
+        await StorageService.instance.recordActiveUsageSeconds(5);
+        if (mounted && !StorageService.instance.hasFullAccess && !_isGateOpen) {
+          _openMandatoryPaywallGate();
+        }
+      });
+    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (StorageService.isTestEnvironment) return;
@@ -55,39 +73,41 @@ class _HomeNavigationScreenState extends State<HomeNavigationScreen> {
         if (mounted) {
           await OnboardingDialog.show(context);
         }
-      } else {
-        final shouldShow =
-            await StorageService.instance.recordAppOpenAndCheckUpsell();
-        final isPro = await StorageService.instance.isProSubscriber();
-        if (shouldShow && mounted && !isPro) {
-          _upsellShownThisSession = true;
-          await ProUpsellDialog.show(context);
-        }
       }
-      _startUsageUpsellTimer();
-    });
-  }
-
-  void _startUsageUpsellTimer() {
-    _usageUpsellTimer?.cancel();
-    if (StorageService.isTestEnvironment) return;
-
-    _usageUpsellTimer = Timer(const Duration(minutes: 3), () async {
-      if (!mounted || _upsellShownThisSession) return;
-      final isPro = await StorageService.instance.isProSubscriber();
-      if (isPro || !mounted || _upsellShownThisSession) return;
-
-      final isCurrentRoute = ModalRoute.of(context)?.isCurrent ?? false;
-      if (isCurrentRoute) {
-        _upsellShownThisSession = true;
-        await ProUpsellDialog.show(context);
+      if (mounted && !StorageService.instance.hasFullAccess && !_isGateOpen) {
+        _openMandatoryPaywallGate();
       }
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _isForeground = state == AppLifecycleState.resumed;
+    if (_isForeground &&
+        !StorageService.isTestEnvironment &&
+        mounted &&
+        !StorageService.instance.hasFullAccess &&
+        !_isGateOpen) {
+      _openMandatoryPaywallGate();
+    }
+  }
+
+  Future<void> _openMandatoryPaywallGate() async {
+    if (_isGateOpen || !mounted) return;
+    _isGateOpen = true;
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => const PaywallScreen(isMandatoryGate: true),
+      ),
+    );
+    _isGateOpen = false;
+  }
+
+  @override
   void dispose() {
-    _usageUpsellTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _usageTimer?.cancel();
+    _billingSyncService.dispose();
     super.dispose();
   }
 
@@ -212,9 +232,119 @@ class _HomeNavigationScreenState extends State<HomeNavigationScreen> {
             }
           },
           child: Scaffold(
-            body: IndexedStack(
-              index: _currentIndex,
-              children: screens,
+            body: Column(
+              children: [
+                if (!StorageService.instance.isProSync &&
+                    !StorageService.instance.isFreeWindowActive)
+                  SafeArea(
+                    bottom: false,
+                    child: GestureDetector(
+                      key: const Key('bannerMonetizationStage'),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PaywallScreen(
+                              isMandatoryGate: !StorageService.instance.hasFullAccess,
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 7,
+                        ),
+                        decoration: BoxDecoration(
+                          color: StorageService.instance.isAccessExpired
+                              ? Colors.redAccent.withValues(alpha: 0.14)
+                              : AppTheme.primary.withValues(alpha: 0.14),
+                          border: Border(
+                            bottom: BorderSide(
+                              color: StorageService.instance.isAccessExpired
+                                  ? Colors.redAccent.withValues(alpha: 0.4)
+                                  : AppTheme.primary.withValues(alpha: 0.4),
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              StorageService.instance.isAccessExpired
+                                  ? Icons.lock_clock_rounded
+                                  : Icons.timer_outlined,
+                              size: 15,
+                              color: StorageService.instance.isAccessExpired
+                                  ? Colors.redAccent
+                                  : AppTheme.primary,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                StorageService.instance.needsTrialActivation
+                                    ? _tr(
+                                        'Activa tu Prueba Gratuita de 7 días para continuar',
+                                        'Start your 7-day Free Trial to continue',
+                                        'Ative seu Free Trial de 7 dias para continuar',
+                                      )
+                                    : StorageService.instance.isSevenDayTrialActive
+                                        ? _tr(
+                                            '⏳ Free Trial activo: ${StorageService.instance.trialDaysRemainingSync} días restantes',
+                                            '⏳ Free Trial active: ${StorageService.instance.trialDaysRemainingSync} days left',
+                                            '⏳ Free Trial ativo: ${StorageService.instance.trialDaysRemainingSync} dias restantes',
+                                          )
+                                        : _tr(
+                                            '🔒 Trial finalizado • Suscríbete a ElectroNorm PRO',
+                                            '🔒 Trial ended • Subscribe to ElectroNorm PRO',
+                                            '🔒 Trial finalizado • Assine o ElectroNorm PRO',
+                                          ),
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: StorageService.instance.isAccessExpired
+                                      ? Colors.redAccent
+                                      : const Color(0xFF93C5FD),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: StorageService.instance.isAccessExpired
+                                    ? Colors.redAccent
+                                    : AppTheme.primary,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                StorageService.instance.needsTrialActivation
+                                    ? 'FREE TRIAL'
+                                    : 'PRO',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: IndexedStack(
+                    index: _currentIndex,
+                    children: screens,
+                  ),
+                ),
+              ],
             ),
             bottomNavigationBar: Container(
             decoration: const BoxDecoration(

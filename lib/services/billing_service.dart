@@ -17,10 +17,18 @@ class BillingService extends ChangeNotifier {
   bool _isStoreAvailable = false;
   bool _isLoadingProducts = true;
   bool _isPurchasePending = false;
+  bool _isSyncingStartupPurchases = false;
   String? _lastError;
   bool _purchaseSucceeded = false;
 
   BillingService({required this.storageService});
+
+  bool get _isBillingPlatformSupported =>
+      !kIsWeb &&
+      !StorageService.isTestEnvironment &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.macOS);
 
   InAppPurchase get _iap => InAppPurchase.instance;
 
@@ -50,6 +58,21 @@ class BillingService extends ChangeNotifier {
       return true;
     }
     return purchaseProduct.rawPrice == 0;
+  }
+
+  bool get hasAnyFreeTrialOffer =>
+      hasFreeTrialOffer(isYearly: false) || hasFreeTrialOffer(isYearly: true);
+
+  ProductDetails? selectPurchaseProduct({
+    required bool isYearly,
+    bool preferFreeTrial = true,
+  }) {
+    final targetId = isYearly ? yearlyProductId : monthlyProductId;
+    final allowTrial = preferFreeTrial && !storageService.isPaidOnlyStage;
+    if (allowTrial) {
+      return _purchaseProducts[targetId] ?? _displayProducts[targetId];
+    }
+    return _displayProducts[targetId] ?? _purchaseProducts[targetId];
   }
 
   /// Indexes Google Play product details into display (recurring base price)
@@ -82,8 +105,8 @@ class BillingService extends ChangeNotifier {
     _purchaseProducts = purchase;
   }
 
-  Future<void> init() async {
-    if (StorageService.isTestEnvironment) {
+  Future<void> init({bool syncPurchases = true}) async {
+    if (!_isBillingPlatformSupported) {
       _isLoadingProducts = false;
       _isStoreAvailable = false;
       notifyListeners();
@@ -96,11 +119,15 @@ class BillingService extends ChangeNotifier {
         onDone: () => _subscription?.cancel(),
         onError: (Object error) {
           _isPurchasePending = false;
+          _isSyncingStartupPurchases = false;
           _lastError = error.toString();
           notifyListeners();
         },
       );
       await loadProducts();
+      if (syncPurchases && _isStoreAvailable) {
+        await syncActivePurchases();
+      }
     } catch (e) {
       _isLoadingProducts = false;
       _lastError = e.toString();
@@ -109,7 +136,8 @@ class BillingService extends ChangeNotifier {
   }
 
   Future<void> loadProducts() async {
-    if (StorageService.isTestEnvironment) {
+    if (!_isBillingPlatformSupported) {
+      _isStoreAvailable = false;
       _isLoadingProducts = false;
       notifyListeners();
       return;
@@ -140,12 +168,27 @@ class BillingService extends ChangeNotifier {
     }
   }
 
-  Future<String?> buySubscription({required bool isYearly}) async {
+  /// Syncs existing Google Play subscriptions silently so canceled/expired trials
+  /// transition the user to the Paid-Only stage.
+  Future<void> syncActivePurchases() async {
+    if (!_isBillingPlatformSupported || !_isStoreAvailable) return;
+    try {
+      _isSyncingStartupPurchases = true;
+      await _iap.restorePurchases();
+    } catch (_) {
+      _isSyncingStartupPurchases = false;
+    }
+  }
+
+  Future<String?> buySubscription({
+    required bool isYearly,
+    bool preferFreeTrial = true,
+  }) async {
     _lastError = null;
     _purchaseSucceeded = false;
     notifyListeners();
 
-    if (StorageService.isTestEnvironment) {
+    if (!_isBillingPlatformSupported) {
       return 'store_unavailable';
     }
 
@@ -154,12 +197,17 @@ class BillingService extends ChangeNotifier {
       return 'store_unavailable';
     }
 
-    final targetId = isYearly ? yearlyProductId : monthlyProductId;
-    var product = _purchaseProducts[targetId] ?? _displayProducts[targetId];
+    var product = selectPurchaseProduct(
+      isYearly: isYearly,
+      preferFreeTrial: preferFreeTrial,
+    );
 
     if (product == null) {
       await loadProducts();
-      product = _purchaseProducts[targetId] ?? _displayProducts[targetId];
+      product = selectPurchaseProduct(
+        isYearly: isYearly,
+        preferFreeTrial: preferFreeTrial,
+      );
     }
 
     if (product == null) {
@@ -191,7 +239,7 @@ class BillingService extends ChangeNotifier {
     _purchaseSucceeded = false;
     notifyListeners();
 
-    if (StorageService.isTestEnvironment) {
+    if (!_isBillingPlatformSupported) {
       return 'store_unavailable';
     }
 
@@ -223,6 +271,34 @@ class BillingService extends ChangeNotifier {
   Future<void> _onPurchaseUpdate(
     List<PurchaseDetails> purchaseDetailsList,
   ) async {
+    if (_isSyncingStartupPurchases) {
+      _isSyncingStartupPurchases = false;
+      final activeSubs = purchaseDetailsList.where(
+        (p) =>
+            productIds.contains(p.productID) &&
+            (p.status == PurchaseStatus.purchased ||
+                p.status == PurchaseStatus.restored),
+      );
+      if (activeSubs.isNotEmpty) {
+        for (final purchaseDetails in purchaseDetailsList) {
+          if (purchaseDetails.pendingCompletePurchase) {
+            await _iap.completePurchase(purchaseDetails);
+          }
+        }
+        await storageService.setProSubscriber(true, fromGooglePlay: true);
+        final firstSub = activeSubs.first;
+        if (firstSub.productID == yearlyProductId) {
+          await storageService.setSubscriptionTier('annual');
+        } else if (firstSub.productID == monthlyProductId) {
+          await storageService.setSubscriptionTier('monthly');
+        }
+      } else if (storageService.hadGoogleSubscription) {
+        await storageService.markGoogleSubscriptionExpired();
+      }
+      notifyListeners();
+      return;
+    }
+
     for (final purchaseDetails in purchaseDetailsList) {
       switch (purchaseDetails.status) {
         case PurchaseStatus.pending:
@@ -249,7 +325,7 @@ class BillingService extends ChangeNotifier {
 
         case PurchaseStatus.purchased:
         case PurchaseStatus.restored:
-          await storageService.setProSubscriber(true);
+          await storageService.setProSubscriber(true, fromGooglePlay: true);
           if (purchaseDetails.productID == yearlyProductId) {
             await storageService.setSubscriptionTier('annual');
           } else if (purchaseDetails.productID == monthlyProductId) {

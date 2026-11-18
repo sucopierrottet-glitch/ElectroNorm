@@ -13,7 +13,6 @@ import '../services/pdf_report_service.dart';
 import '../services/storage_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/onboarding_dialog.dart';
-import '../widgets/pro_upsell_dialog.dart';
 import '../widgets/raceway_painter.dart';
 import 'paywall_screen.dart';
 import 'report_preview_screen.dart';
@@ -591,7 +590,11 @@ class CalculatorScreenState extends State<CalculatorScreen> {
     final canSave = await StorageService.instance.canCreateProject();
     if (!canSave) {
       if (mounted) {
-        await ProUpsellDialog.show(context);
+        await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => const PaywallScreen(isMandatoryGate: true),
+          ),
+        );
       }
       return;
     }

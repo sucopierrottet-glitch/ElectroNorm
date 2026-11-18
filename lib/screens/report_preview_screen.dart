@@ -82,11 +82,14 @@ class _ReportPreviewScreenState extends State<ReportPreviewScreen> {
   }
 
   Future<bool> _ensureProAccess() async {
-    final isPro = await StorageService.instance.isProSubscriber();
-    if (isPro) return true;
+    final storage = StorageService.instance;
+    final isPro = await storage.isProSubscriber();
+    if (isPro || storage.hasFullAccess) return true;
     if (!mounted) return false;
     final upgraded = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(builder: (ctx) => const PaywallScreen()),
+      MaterialPageRoute(
+        builder: (ctx) => PaywallScreen(isMandatoryGate: !storage.hasFullAccess),
+      ),
     );
     return upgraded == true;
   }

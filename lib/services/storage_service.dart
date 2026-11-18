@@ -363,9 +363,31 @@ abstract class StorageService implements Listenable {
   Future<TechnicianProfile> getProfile();
   Future<void> saveProfile(TechnicianProfile profile);
 
-  // Pro Subscription & Store Monetization
+  // Pro Subscription & 3-Stage Store Monetization
+  static const int maxFreeUsageSeconds = 7200; // 2 horas de uso activo gratis con todo PRO
+  static const int trialDurationDays = 7;
+
+  bool get isProSync;
+  bool get hadGoogleSubscription;
+  int get freeSecondsUsed;
+  int get freeSecondsRemaining;
+  String get formattedFreeTimeRemaining;
+  bool get isFreeWindowActive;
+  bool get needsTrialActivation;
+  bool get hasStartedTrial;
+  int get trialDaysRemainingSync;
+  bool get isSevenDayTrialActive;
+  bool get isPaidOnlyStage;
+  bool get hasFullAccess;
+  bool get isAccessExpired;
+
+  Future<void> recordActiveUsageSeconds(int deltaSeconds);
+  Future<void> activateSevenDayFreeTrial();
+  Future<void> markGoogleSubscriptionExpired();
+  Future<void> debugSetMonetizationStage(int stage);
+
   Future<bool> isProSubscriber();
-  Future<void> setProSubscriber(bool value);
+  Future<void> setProSubscriber(bool value, {bool fromGooglePlay = false});
   Future<String?> getSubscriptionTier();
   Future<void> setSubscriptionTier(String? tier);
   Future<DateTime?> getTrialStartDate();
@@ -390,12 +412,34 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
   static const String _keyOnboarding = 'electronorm_has_seen_onboarding';
   static const String _keyAppOpenCount = 'electronorm_app_open_count';
   static const String _keyMonthlyUsagePrefix = 'electronorm_created_month_';
+  static const String _keyFreeSecondsUsed = 'electronorm_free_seconds_used';
+  static const String _keyHadGoogleSub = 'electronorm_had_google_sub';
+  static const String _keyTrialExpiredFlag = 'electronorm_trial_expired';
 
   final SharedPreferences? _injectedPrefs;
   String _localeCode = 'es';
   NormativeCountry _normativeCountry = NormativeCountry.mexico;
   MeasurementUnitSystem _unitSystem = MeasurementUnitSystem.metric;
   bool _localeInitialized = false;
+
+  // Cached 3-stage monetization state
+  bool _isProCached = false;
+  bool _isDemoCached = false;
+  int _freeSecondsUsed = 0;
+  DateTime? _trialStartCached;
+  bool _hadGoogleSubscription = false;
+  bool _trialExpired = false;
+
+  void _syncMonetizationFromPrefs(SharedPreferences prefs) {
+    _isProCached = prefs.getBool(_keyIsPro) ?? false;
+    _isDemoCached = prefs.getBool(_keyDemoMode) ?? false;
+    _freeSecondsUsed = (prefs.getInt(_keyFreeSecondsUsed) ?? 0)
+        .clamp(0, StorageService.maxFreeUsageSeconds);
+    final trialStr = prefs.getString(_keyTrialStart);
+    _trialStartCached = trialStr != null ? DateTime.tryParse(trialStr) : null;
+    _hadGoogleSubscription = prefs.getBool(_keyHadGoogleSub) ?? false;
+    _trialExpired = prefs.getBool(_keyTrialExpiredFlag) ?? false;
+  }
 
   SharedPreferencesStorageService([this._injectedPrefs]) {
     if (_injectedPrefs != null) {
@@ -426,6 +470,7 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
         _unitSystem = _normativeCountry.defaultUnitSystem;
       }
       _localeInitialized = true;
+      _syncMonetizationFromPrefs(_injectedPrefs);
     } else if (!StorageService.isTestEnvironment) {
       _localeCode = StorageService.detectDeviceLocaleCode();
       _normativeCountry = StorageService.detectDeviceCountry();
@@ -466,6 +511,7 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
       _unitSystem = _normativeCountry.defaultUnitSystem;
     }
 
+    _syncMonetizationFromPrefs(prefs);
     _localeInitialized = true;
     notifyListeners();
   }
@@ -575,23 +621,21 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
 
   @override
   Future<int> getRemainingFreeProjects() async {
-    if (await isProSubscriber()) return 999999;
-    final used = await getProjectsCountThisMonth();
-    final remaining = 3 - used;
-    return remaining > 0 ? remaining : 0;
+    if (await isProSubscriber() || hasFullAccess) return 999999;
+    return 0;
   }
 
   @override
   Future<bool> canCreateProject() async {
-    if (await isProSubscriber()) return true;
-    final used = await getProjectsCountThisMonth();
-    return used < 3;
+    if (await isProSubscriber() || hasFullAccess) return true;
+    return false;
   }
 
   Future<SharedPreferences> _getPrefs() async {
     final prefs = _injectedPrefs ?? await SharedPreferences.getInstance();
     if (!_localeInitialized) {
       _localeInitialized = true;
+      _syncMonetizationFromPrefs(prefs);
       if (prefs.containsKey(_keyLocale)) {
         final saved = prefs.getString(_keyLocale);
         if (saved != null && saved.isNotEmpty) {
@@ -713,9 +757,18 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
     await prefs.remove(_keyUnitSystem);
     await prefs.remove(_keyOnboarding);
     await prefs.remove(_keyAppOpenCount);
+    await prefs.remove(_keyFreeSecondsUsed);
+    await prefs.remove(_keyHadGoogleSub);
+    await prefs.remove(_keyTrialExpiredFlag);
     _localeCode = 'es';
     _normativeCountry = NormativeCountry.mexico;
     _unitSystem = MeasurementUnitSystem.metric;
+    _isProCached = false;
+    _isDemoCached = false;
+    _freeSecondsUsed = 0;
+    _trialStartCached = null;
+    _hadGoogleSubscription = false;
+    _trialExpired = false;
     notifyListeners();
   }
 
@@ -746,7 +799,190 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
     notifyListeners();
   }
 
-  // --- Pro Subscription & Store Monetization ---
+  // --- Pro Subscription & 3-Stage Store Monetization ---
+
+  @override
+  bool get isProSync => _isProCached || _isDemoCached;
+
+  @override
+  bool get hadGoogleSubscription => _hadGoogleSubscription;
+
+  @override
+  int get freeSecondsUsed => _freeSecondsUsed;
+
+  @override
+  int get freeSecondsRemaining =>
+      (StorageService.maxFreeUsageSeconds - _freeSecondsUsed)
+          .clamp(0, StorageService.maxFreeUsageSeconds);
+
+  @override
+  String get formattedFreeTimeRemaining {
+    final rem = freeSecondsRemaining;
+    final hrs = rem ~/ 3600;
+    final mins = (rem % 3600) ~/ 60;
+    final secs = rem % 60;
+    if (hrs > 0) return '${hrs}h ${mins.toString().padLeft(2, '0')}m';
+    if (mins > 0) return '${mins}m ${secs.toString().padLeft(2, '0')}s';
+    return '${secs}s';
+  }
+
+  /// Etapa 1: 2 horas de uso activo gratis con absolutamente todo PRO disponible
+  @override
+  bool get isFreeWindowActive =>
+      !isProSync &&
+      _trialStartCached == null &&
+      !_trialExpired &&
+      freeSecondsRemaining > 0;
+
+  /// Transición Etapa 1 -> Etapa 2: terminaron las 2 horas gratis y obliga a activar el Free Trial (con tarjeta)
+  @override
+  bool get needsTrialActivation =>
+      !isProSync &&
+      _trialStartCached == null &&
+      !_trialExpired &&
+      freeSecondsRemaining <= 0;
+
+  @override
+  bool get hasStartedTrial =>
+      _trialStartCached != null || _trialExpired || _hadGoogleSubscription;
+
+  @override
+  int get trialDaysRemainingSync {
+    if (isProSync) return 999;
+    if (_trialStartCached == null) return StorageService.trialDurationDays;
+    final elapsedDays = DateTime.now().difference(_trialStartCached!).inDays;
+    return (StorageService.trialDurationDays - elapsedDays)
+        .clamp(0, StorageService.trialDurationDays);
+  }
+
+  /// Etapa 2 (local/simulada): Free Trial de 7 días activo
+  @override
+  bool get isSevenDayTrialActive =>
+      !isProSync &&
+      _trialStartCached != null &&
+      !_trialExpired &&
+      trialDaysRemainingSync > 0;
+
+  /// Etapa 3: Terminaron las 2 horas gratis y el Free Trial -> Solo suscripción pagada
+  @override
+  bool get isPaidOnlyStage =>
+      !isProSync &&
+      (_trialExpired ||
+          (_trialStartCached != null && trialDaysRemainingSync <= 0));
+
+  @override
+  bool get hasFullAccess =>
+      isProSync || isFreeWindowActive || isSevenDayTrialActive;
+
+  @override
+  bool get isAccessExpired => !hasFullAccess;
+
+  @override
+  Future<void> recordActiveUsageSeconds(int deltaSeconds) async {
+    if (!isFreeWindowActive || deltaSeconds <= 0) return;
+    final next = (_freeSecondsUsed + deltaSeconds)
+        .clamp(0, StorageService.maxFreeUsageSeconds);
+    if (next == _freeSecondsUsed) return;
+    _freeSecondsUsed = next;
+    final prefs = await _getPrefs();
+    await prefs.setInt(_keyFreeSecondsUsed, _freeSecondsUsed);
+    notifyListeners();
+  }
+
+  @override
+  Future<void> activateSevenDayFreeTrial() async {
+    _trialStartCached = DateTime.now();
+    _trialExpired = false;
+    _freeSecondsUsed = StorageService.maxFreeUsageSeconds;
+    final prefs = await _getPrefs();
+    await prefs.setString(_keyTrialStart, _trialStartCached!.toIso8601String());
+    await prefs.setString(_keyTier, 'trial_7d');
+    await prefs.setBool(_keyTrialExpiredFlag, false);
+    await prefs.setInt(_keyFreeSecondsUsed, _freeSecondsUsed);
+    notifyListeners();
+  }
+
+  @override
+  Future<void> markGoogleSubscriptionExpired() async {
+    _isProCached = false;
+    _trialExpired = true;
+    _freeSecondsUsed = StorageService.maxFreeUsageSeconds;
+    final prefs = await _getPrefs();
+    await prefs.setBool(_keyIsPro, false);
+    await prefs.setBool(_keyTrialExpiredFlag, true);
+    await prefs.setInt(_keyFreeSecondsUsed, _freeSecondsUsed);
+    notifyListeners();
+  }
+
+  @override
+  Future<void> debugSetMonetizationStage(int stage) async {
+    final prefs = await _getPrefs();
+    switch (stage) {
+      case 0: // Etapa 1: 2 horas gratis con todo desbloqueado
+        _isProCached = false;
+        _isDemoCached = false;
+        _freeSecondsUsed = 0;
+        _trialStartCached = null;
+        _trialExpired = false;
+        _hadGoogleSubscription = false;
+        await prefs.setBool(_keyIsPro, false);
+        await prefs.setBool(_keyDemoMode, false);
+        await prefs.setInt(_keyFreeSecondsUsed, 0);
+        await prefs.remove(_keyTrialStart);
+        await prefs.setBool(_keyTrialExpiredFlag, false);
+        await prefs.setBool(_keyHadGoogleSub, false);
+        break;
+      case 1: // Fin de 2 horas -> Obliga a activar Free Trial con tarjeta
+        _isProCached = false;
+        _isDemoCached = false;
+        _freeSecondsUsed = StorageService.maxFreeUsageSeconds;
+        _trialStartCached = null;
+        _trialExpired = false;
+        _hadGoogleSubscription = false;
+        await prefs.setBool(_keyIsPro, false);
+        await prefs.setBool(_keyDemoMode, false);
+        await prefs.setInt(_keyFreeSecondsUsed, _freeSecondsUsed);
+        await prefs.remove(_keyTrialStart);
+        await prefs.setBool(_keyTrialExpiredFlag, false);
+        await prefs.setBool(_keyHadGoogleSub, false);
+        break;
+      case 2: // Etapa 2: Free Trial de 7 días activo
+        _isProCached = false;
+        _isDemoCached = false;
+        _freeSecondsUsed = StorageService.maxFreeUsageSeconds;
+        _trialStartCached = DateTime.now();
+        _trialExpired = false;
+        await prefs.setBool(_keyIsPro, false);
+        await prefs.setBool(_keyDemoMode, false);
+        await prefs.setInt(_keyFreeSecondsUsed, _freeSecondsUsed);
+        await prefs.setString(_keyTrialStart, _trialStartCached!.toIso8601String());
+        await prefs.setBool(_keyTrialExpiredFlag, false);
+        break;
+      case 3: // Etapa 3: Trial finalizado -> Solo suscripción pagada
+        _isProCached = false;
+        _isDemoCached = false;
+        _freeSecondsUsed = StorageService.maxFreeUsageSeconds;
+        _trialStartCached = DateTime.now().subtract(const Duration(days: 10));
+        _trialExpired = true;
+        _hadGoogleSubscription = true;
+        await prefs.setBool(_keyIsPro, false);
+        await prefs.setBool(_keyDemoMode, false);
+        await prefs.setInt(_keyFreeSecondsUsed, _freeSecondsUsed);
+        await prefs.setString(_keyTrialStart, _trialStartCached!.toIso8601String());
+        await prefs.setBool(_keyTrialExpiredFlag, true);
+        await prefs.setBool(_keyHadGoogleSub, true);
+        break;
+      case 4: // Suscripción PRO pagada activa
+        _isProCached = true;
+        _trialExpired = false;
+        _freeSecondsUsed = StorageService.maxFreeUsageSeconds;
+        await prefs.setBool(_keyIsPro, true);
+        await prefs.setBool(_keyTrialExpiredFlag, false);
+        await prefs.setInt(_keyFreeSecondsUsed, _freeSecondsUsed);
+        break;
+    }
+    notifyListeners();
+  }
 
   @override
   Future<bool> isProSubscriber() async {
@@ -756,6 +992,7 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
 
       final prefs = await _getPrefs();
       final isPro = prefs.getBool(_keyIsPro) ?? false;
+      _isProCached = isPro;
       if (isPro) return true;
 
       final trial = await isTrialActive();
@@ -766,14 +1003,25 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
   }
 
   @override
-  Future<void> setProSubscriber(bool value) async {
+  Future<void> setProSubscriber(bool value, {bool fromGooglePlay = false}) async {
     final prefs = await _getPrefs();
+    _isProCached = value;
     await prefs.setBool(_keyIsPro, value);
     if (value) {
       final currentTier = prefs.getString(_keyTier);
       if (currentTier == null) {
         await prefs.setString(_keyTier, 'annual');
       }
+    }
+    if (fromGooglePlay && value) {
+      _hadGoogleSubscription = true;
+      _trialExpired = false;
+      _freeSecondsUsed = StorageService.maxFreeUsageSeconds;
+      _trialStartCached ??= DateTime.now();
+      await prefs.setBool(_keyHadGoogleSub, true);
+      await prefs.setBool(_keyTrialExpiredFlag, false);
+      await prefs.setInt(_keyFreeSecondsUsed, _freeSecondsUsed);
+      await prefs.setString(_keyTrialStart, _trialStartCached!.toIso8601String());
     }
     notifyListeners();
   }
@@ -800,8 +1048,12 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
     try {
       final prefs = await _getPrefs();
       final str = prefs.getString(_keyTrialStart);
-      if (str == null) return null;
-      return DateTime.tryParse(str);
+      if (str == null) {
+        _trialStartCached = null;
+        return null;
+      }
+      _trialStartCached = DateTime.tryParse(str);
+      return _trialStartCached;
     } catch (_) {
       return null;
     }
@@ -810,26 +1062,34 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
   @override
   Future<void> startTrial() async {
     final prefs = await _getPrefs();
-    await prefs.setString(_keyTrialStart, DateTime.now().toIso8601String());
+    _trialStartCached = DateTime.now();
+    _trialExpired = false;
+    _isProCached = true;
+    _freeSecondsUsed = StorageService.maxFreeUsageSeconds;
+    await prefs.setString(_keyTrialStart, _trialStartCached!.toIso8601String());
     await prefs.setString(_keyTier, 'trial_7d');
     await prefs.setBool(_keyIsPro, true);
+    await prefs.setBool(_keyTrialExpiredFlag, false);
+    await prefs.setInt(_keyFreeSecondsUsed, _freeSecondsUsed);
     notifyListeners();
   }
 
   @override
   Future<bool> isTrialActive() async {
+    if (_trialExpired) return false;
     final start = await getTrialStartDate();
     if (start == null) return false;
     final elapsed = DateTime.now().difference(start);
-    return elapsed.inDays < 7;
+    return elapsed.inDays < StorageService.trialDurationDays;
   }
 
   @override
   Future<int> getRemainingTrialDays() async {
+    if (_trialExpired) return 0;
     final start = await getTrialStartDate();
     if (start == null) return 0;
     final elapsed = DateTime.now().difference(start);
-    final remaining = 7 - elapsed.inDays;
+    final remaining = StorageService.trialDurationDays - elapsed.inDays;
     return remaining > 0 ? remaining : 0;
   }
 
@@ -837,7 +1097,8 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
   Future<bool> isDemoMode() async {
     try {
       final prefs = await _getPrefs();
-      return prefs.getBool(_keyDemoMode) ?? false;
+      _isDemoCached = prefs.getBool(_keyDemoMode) ?? false;
+      return _isDemoCached;
     } catch (_) {
       return false;
     }
@@ -846,8 +1107,10 @@ class SharedPreferencesStorageService extends ChangeNotifier implements StorageS
   @override
   Future<void> setDemoMode(bool enabled) async {
     final prefs = await _getPrefs();
+    _isDemoCached = enabled;
     await prefs.setBool(_keyDemoMode, enabled);
     if (enabled) {
+      _isProCached = true;
       await prefs.setBool(_keyIsPro, true);
     }
     notifyListeners();
